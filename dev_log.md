@@ -11,3 +11,10 @@
 - Initialized Next.js App Router project and converted all static HTML mockups into React components (`src/app/page.tsx`, `src/app/case-intake/page.tsx`, `src/app/workspace/page.tsx`, `src/app/memory-browser/page.tsx`).
 - Stripped Tailwind configuration to enforce pure Vanilla CSS per project requirements.
 - Cleaned up root directory by deleting legacy `.html` mockups and default Next.js boilerplate assets (SVGs).
+
+**2026-07-08 (Current Session)**
+- **Authentication & Global Layout:** Integrated Supabase Auth for Email/Password and Google OAuth. Built a global, sticky `Navbar` with functional User Profile dropdowns, and enforced correct post-auth routing (redirecting to `/` rather than `/history`).
+- **UI/UX Polishing & Layout Fixes:** Resolved severe layout issues including global `overflow: hidden` scroll blocking, fixed text-wrapping on the main Hero gradient heading (`whitespace-nowrap`), and repaired z-index/clipping issues on dropdown menus.
+- **Case Intake (`/case-intake`) Overhaul:** Completely rebuilt the intake form into a premium, segmented SaaS interface with a frosted glass upload zone. Wired all inputs to React `useState` to generate a strict JSON payload matching the `inzex_engine.py` wrapper API (utilizing Volatility 3 symbol hints and specific plugin depth maps). Conditionally hid the marketing Navbar for this route.
+- **Memory Browser (`/memory-browser`) Refactor:** Converted the mock table into a highly technical, stateful component. Implemented an interactive Plugin Selector. Enforced strict Volatility 3 schema accuracy by separating `windows.pslist` (PID, PPID, CreateTime) from `windows.malfind` (Detail panel, PAGE_EXECUTE_READWRITE anomaly, MZ Hex Dump, and Gemma 3 process injection citations).
+- **React Runtime Fix:** Corrected a critical "Rendered fewer hooks than expected" crash by reordering `usePathname` early returns in `Navbar.tsx` below `useEffect` declarations.

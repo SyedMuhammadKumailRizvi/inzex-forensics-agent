@@ -2,15 +2,36 @@
 
 import { useState } from "react";
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { UploadCloud, ArrowLeft, Cpu, HardDrive } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { CustomSelect } from "@/components/ui/CustomSelect";
 
 export default function CaseIntakePage() {
-  const [osProfile, setOsProfile] = useState("auto");
+  const router = useRouter();
+  
+  const [caseDesignation, setCaseDesignation] = useState("");
+  const [referenceId, setReferenceId] = useState("");
+  const [leadInvestigator, setLeadInvestigator] = useState("");
+  
+  const [osProfile, setOsProfile] = useState("windows");
   const [analysisDepth, setAnalysisDepth] = useState("standard");
   const [isUploading, setIsUploading] = useState(false);
+
+  const handleInitialize = () => {
+    const payload = {
+      case_designation: caseDesignation || "Inzex-Alpha",
+      reference_id: referenceId || "REF-2026-001",
+      lead_investigator: leadInvestigator || "Syed Muhammad Kumail Rizvi",
+      target_os: osProfile,
+      analysis_depth: analysisDepth,
+      file_path: "storage/v1/object/public/vmem-dumps/cridex.vmem"
+    };
+    
+    console.log("Volatility 3 Payload Finalized:", JSON.stringify(payload, null, 2));
+    router.push("/memory-browser");
+  };
 
   return (
     <div className="app pt-8 lg:pt-12 relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 min-h-screen">
@@ -43,17 +64,17 @@ export default function CaseIntakePage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <label className="block text-[11px] font-semibold text-zinc-500 mb-2 uppercase tracking-widest">Case Designation</label>
-                  <Input type="text" placeholder="e.g. OP-MIDNIGHT-SUN" className="bg-[#121215] border-white/5 shadow-inner" />
+                  <Input value={caseDesignation} onChange={(e) => setCaseDesignation(e.target.value)} type="text" placeholder="e.g. OP-MIDNIGHT-SUN" className="bg-[#121215] border-white/5 shadow-inner" />
                 </div>
                 <div>
                   <label className="block text-[11px] font-semibold text-zinc-500 mb-2 uppercase tracking-widest">Reference ID</label>
-                  <Input type="text" placeholder="e.g. INC-2026-0881" className="bg-[#121215] border-white/5 shadow-inner" />
+                  <Input value={referenceId} onChange={(e) => setReferenceId(e.target.value)} type="text" placeholder="e.g. INC-2026-0881" className="bg-[#121215] border-white/5 shadow-inner" />
                 </div>
               </div>
 
               <div>
                 <label className="block text-[11px] font-semibold text-zinc-500 mb-2 uppercase tracking-widest">Lead Investigator</label>
-                <Input type="text" placeholder="Analyst ID or Full Name" className="bg-[#121215] border-white/5 shadow-inner" />
+                <Input value={leadInvestigator} onChange={(e) => setLeadInvestigator(e.target.value)} type="text" placeholder="Analyst ID or Full Name" className="bg-[#121215] border-white/5 shadow-inner" />
               </div>
             </div>
           </div>
@@ -70,7 +91,7 @@ export default function CaseIntakePage() {
                   <UploadCloud className="h-6 w-6 text-zinc-400 group-hover:text-white transition-colors" />
                 </div>
                 <div className="text-sm font-medium mb-1 text-zinc-300">Click to upload or drag and drop</div>
-                <div className="text-xs text-zinc-500">Supports .raw, .mem, .img (Maximum size: 128GB)</div>
+                <div className="text-xs text-zinc-500">Supports .raw, .mem, .img, .vmem (Recommended size: &lt; 4GB)</div>
                 <input type="file" className="absolute inset-0 opacity-0 cursor-pointer z-20" />
               </div>
             </div>
@@ -85,16 +106,15 @@ export default function CaseIntakePage() {
             <div className="p-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="relative z-50">
-                  <label className="block text-[11px] font-semibold text-zinc-500 mb-2 uppercase tracking-widest">Target OS Profile</label>
+                  <label className="block text-[11px] font-semibold text-zinc-500 mb-2 uppercase tracking-widest">Symbol Operating System Hint</label>
                   <CustomSelect 
                     value={osProfile} 
                     onChange={setOsProfile}
                     options={[
-                      { label: "Auto-Detect (Volatility 3)", value: "auto" },
-                      { label: "Windows 10 / 11", value: "win10" },
-                      { label: "Windows 7", value: "win7" },
-                      { label: "Linux (Generic)", value: "linux" },
-                      { label: "macOS", value: "mac" }
+                      { label: "Automatic Detection (Recommended)", value: "auto" },
+                      { label: "Windows (x86/x64)", value: "windows" },
+                      { label: "Linux (x64)", value: "linux" },
+                      { label: "macOS (x64)", value: "macos" }
                     ]}
                   />
                 </div>
@@ -104,9 +124,9 @@ export default function CaseIntakePage() {
                     value={analysisDepth} 
                     onChange={setAnalysisDepth}
                     options={[
-                      { label: "Quick Triage (Maelstrom)", value: "quick" },
-                      { label: "Standard Forensics", value: "standard" },
-                      { label: "Deep Inspection (Gemma 3 Assisted)", value: "deep" }
+                      { label: "Quick Scan (pslist, pstree)", value: "quick" },
+                      { label: "Standard Scan (+netscan, cmdline)", value: "standard" },
+                      { label: "Deep Forensic Scan (+malfind, vadinfo)", value: "deep" }
                     ]}
                   />
                 </div>
@@ -115,11 +135,9 @@ export default function CaseIntakePage() {
           </div>
 
           <div className="pt-4 flex justify-end">
-            <Link href="/memory-browser">
-              <Button variant="primary" size="lg" className="shadow-[0_0_20px_rgba(157,0,255,0.15)] hover:shadow-[0_0_30px_rgba(157,0,255,0.3)] bg-[#9D00FF]/20 hover:bg-[#9D00FF]/30 border border-[#9D00FF]/50 px-8">
-                Initialize Analysis Sequence
-              </Button>
-            </Link>
+            <Button onClick={handleInitialize} variant="primary" size="lg" className="shadow-[0_0_20px_rgba(157,0,255,0.15)] hover:shadow-[0_0_30px_rgba(157,0,255,0.3)] bg-[#9D00FF]/20 hover:bg-[#9D00FF]/30 border border-[#9D00FF]/50 px-8">
+              Initialize Analysis Sequence
+            </Button>
           </div>
         </div>
 
