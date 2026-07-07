@@ -9,13 +9,13 @@ export default function MemoryBrowser() {
           <Link href="/workspace" style={{ textDecoration: 'none' }}>
             <button className="mode-btn" style={{ fontFamily: 'var(--sans)', fontSize: 12, padding: '7px 16px', background: 'var(--bg-surface)', color: 'var(--text-secondary)', border: 'none', cursor: 'pointer' }}>Human Review Workspace</button>
           </Link>
-          <button className="mode-btn active" style={{ fontFamily: 'var(--sans)', fontSize: 12, padding: '7px 16px', background: 'var(--red-dim)', color: '#E9989E', border: 'none', cursor: 'pointer' }}>Process Browser</button>
+          <button className="mode-btn active" style={{ fontFamily: 'var(--sans)', fontSize: 12, padding: '7px 16px', background: 'var(--red-dim)', color: '#D6A6FF', border: 'none', cursor: 'pointer' }}>Process Browser</button>
         </div>
       </div>
 
       <div className="filter-bar" style={{ display: 'flex', gap: 10, marginBottom: 14 }}>
         <input className="filter-input" type="text" placeholder="Filter — e.g. PID == 666, Process == svchost.exe" defaultValue="Process == svchost.exe" style={{ flex: 1, background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 7, padding: '10px 14px', fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--text-primary)' }} />
-        <div className="filter-chip flagged" style={{ fontFamily: 'var(--mono)', fontSize: 11, padding: '9px 14px', borderRadius: 7, border: '1px solid var(--red-glow)', color: '#D98A90', background: 'var(--red-dim)', whiteSpace: 'nowrap', cursor: 'pointer' }}>● 7 AI-flagged</div>
+        <div className="filter-chip flagged" style={{ fontFamily: 'var(--mono)', fontSize: 11, padding: '9px 14px', borderRadius: 7, border: '1px solid var(--red-glow)', color: '#C58AFF', background: 'var(--red-dim)', whiteSpace: 'nowrap', cursor: 'pointer' }}>● 7 AI-flagged</div>
         <div className="filter-chip" style={{ fontFamily: 'var(--mono)', fontSize: 11, padding: '9px 14px', borderRadius: 7, border: '1px solid var(--border)', background: 'var(--bg-raised)', color: 'var(--text-secondary)', whiteSpace: 'nowrap', cursor: 'pointer' }}>128 Processes</div>
         <div className="filter-chip" style={{ fontFamily: 'var(--mono)', fontSize: 11, padding: '9px 14px', borderRadius: 7, border: '1px solid var(--border)', background: 'var(--bg-raised)', color: 'var(--text-secondary)', whiteSpace: 'nowrap', cursor: 'pointer' }}>Plugin: windows.pslist</div>
       </div>
@@ -52,7 +52,7 @@ export default function MemoryBrowser() {
               <td style={{ padding: '8px 14px', borderBottom: '1px solid var(--border-soft)', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>50</td>
               <td style={{ padding: '8px 14px', borderBottom: '1px solid var(--border-soft)', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>0</td>
             </tr>
-            <tr className="flagged selected" style={{ background: 'rgba(179,37,47,0.06)', outline: '1px solid var(--red)', outlineOffset: -1 }}>
+            <tr className="flagged selected" style={{ background: 'rgba(157,0,255,0.06)', outline: '1px solid var(--red)', outlineOffset: -1 }}>
               <td style={{ padding: '8px 14px', borderBottom: '1px solid var(--border-soft)', color: 'var(--text-primary)', whiteSpace: 'nowrap' }} className="col-pid"><span className="badge-flag" style={{ display: 'inline-block', width: 6, height: 6, borderRadius: '50%', background: 'var(--red)', marginRight: 8 }}></span>666</td>
               <td style={{ padding: '8px 14px', borderBottom: '1px solid var(--border-soft)', color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>svchost.exe</td>
               <td style={{ padding: '8px 14px', borderBottom: '1px solid var(--border-soft)', color: 'var(--text-primary)', whiteSpace: 'nowrap' }} className="col-ppid">500</td>
@@ -70,7 +70,7 @@ export default function MemoryBrowser() {
               <td style={{ padding: '8px 14px', borderBottom: '1px solid var(--border-soft)', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>250</td>
               <td style={{ padding: '8px 14px', borderBottom: '1px solid var(--border-soft)', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>0</td>
             </tr>
-            <tr className="flagged" style={{ background: 'rgba(179,37,47,0.06)' }}>
+            <tr className="flagged" style={{ background: 'rgba(157,0,255,0.06)' }}>
               <td style={{ padding: '8px 14px', borderBottom: '1px solid var(--border-soft)', color: 'var(--text-primary)', whiteSpace: 'nowrap' }} className="col-pid"><span className="badge-flag" style={{ display: 'inline-block', width: 6, height: 6, borderRadius: '50%', background: 'var(--red)', marginRight: 8 }}></span>1337</td>
               <td style={{ padding: '8px 14px', borderBottom: '1px solid var(--border-soft)', color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>powershell.exe</td>
               <td style={{ padding: '8px 14px', borderBottom: '1px solid var(--border-soft)', color: 'var(--text-primary)', whiteSpace: 'nowrap' }} className="col-ppid">666</td>
@@ -91,8 +91,8 @@ export default function MemoryBrowser() {
             <div><span className="k" style={{ color: 'var(--text-tertiary)' }}>Virtual Offset:</span> <span className="v" style={{ color: 'var(--text-primary)' }}>0x0000020B4C00</span></div>
             <div><span className="k" style={{ color: 'var(--text-tertiary)' }}>Parent PID:</span> <span className="v" style={{ color: 'var(--text-primary)' }}>500 (services.exe)</span></div>
             <div><span className="k" style={{ color: 'var(--text-tertiary)' }}>Create Time:</span> <span className="v" style={{ color: 'var(--text-primary)' }}>2026-07-06 14:22:05 UTC</span></div>
-            <div className="flag-row" style={{ color: '#D98A90' }}><span className="k" style={{ color: 'var(--text-tertiary)' }}>Memory Protection:</span> <span className="v" style={{ color: 'var(--text-primary)' }}>PAGE_EXECUTE_READWRITE</span> — Anomalous for svchost</div>
-            <div className="flag-row" style={{ color: '#D98A90' }}><span className="k" style={{ color: 'var(--text-tertiary)' }}>AI Note:</span> Cited as evidence for T1055 Process Injection</div>
+            <div className="flag-row" style={{ color: '#C58AFF' }}><span className="k" style={{ color: 'var(--text-tertiary)' }}>Memory Protection:</span> <span className="v" style={{ color: 'var(--text-primary)' }}>PAGE_EXECUTE_READWRITE</span> — Anomalous for svchost</div>
+            <div className="flag-row" style={{ color: '#C58AFF' }}><span className="k" style={{ color: 'var(--text-tertiary)' }}>AI Note:</span> Cited as evidence for T1055 Process Injection</div>
           </div>
           <div className="hex-dump" style={{ fontFamily: 'var(--mono)', fontSize: 11, lineHeight: 1.9, color: 'var(--text-tertiary)', background: 'var(--bg-page)', border: '1px solid var(--border-soft)', borderRadius: 6, padding: '12px 14px', whiteSpace: 'pre', overflowX: 'auto' }}>
             0x0000020b4c00  4d 5a 90 00 03 00 00 00 04 00 00 00 ff ff 00 00  <span className="hi" style={{ color: 'var(--red)' }}>MZ..............</span>

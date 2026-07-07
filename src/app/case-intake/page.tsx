@@ -1,89 +1,149 @@
-import Link from 'next/link';
+"use client";
 
-export default function CaseIntake() {
+import { useState } from "react";
+import Link from 'next/link';
+import { UploadCloud, ArrowLeft, Cpu, HardDrive } from "lucide-react";
+import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
+import { CustomSelect } from "@/components/ui/CustomSelect";
+
+export default function CaseIntakePage() {
+  const [osProfile, setOsProfile] = useState("auto");
+  const [analysisDepth, setAnalysisDepth] = useState("standard");
+  const [isUploading, setIsUploading] = useState(false);
+
   return (
     <div className="app">
-      <div className="brand-row" style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 44 }}>
-        <div className="brand-mark" style={{ width: 26, height: 26, border: '1.5px solid var(--red)', borderRadius: 5, position: 'relative' }}></div>
-        <div className="brand-name" style={{ fontFamily: 'var(--mono)', fontSize: 13, letterSpacing: 2, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Inzex Forensics</div>
-      </div>
-
-      <h1 style={{ fontSize: 26, fontWeight: 600, margin: '0 0 6px' }}>Initialize DFIR Workspace</h1>
-      <p className="subtitle" style={{ fontSize: 14, color: 'var(--text-secondary)', margin: '0 0 40px' }}>
-        Case details define the metadata for the Volatility 3 analysis run and final AI report.
-      </p>
-
-      <p className="section-label" style={{ fontFamily: 'var(--mono)', fontSize: 11, letterSpacing: 1.5, textTransform: 'uppercase', color: 'var(--text-tertiary)', margin: '0 0 16px', paddingTop: 0, borderTop: 'none' }}>Case details</p>
-      <div className="field-row" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
-        <div className="field" style={{ marginBottom: 16 }}>
-          <label style={{ display: 'block', fontSize: 12, color: 'var(--text-secondary)', marginBottom: 7 }}>Case number <span className="req" style={{ color: 'var(--red)' }}>*</span></label>
-          <input type="text" placeholder="e.g. INZ-104" defaultValue="INZ-104" style={{ width: '100%', background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 7, color: 'var(--text-primary)', fontFamily: 'var(--sans)', fontSize: 14, padding: '11px 13px' }} />
+      {/* Top Navbar Area */}
+      <nav className="navbar mb-12 rounded-2xl flex items-center gap-6">
+        <Link href="/">
+          <Button variant="ghost" size="sm">
+            <ArrowLeft className="mr-2 h-4 w-4" /> Back to System
+          </Button>
+        </Link>
+        <div className="h-6 w-px bg-white/10" />
+        <h1 className="text-xl font-medium tracking-tight text-white m-0">Case Intake & Intelligence Setup</h1>
+        <div className="ml-auto flex items-center gap-4">
+          <Link href="/history">
+            <Button variant="outline" size="sm">Case History</Button>
+          </Link>
         </div>
-        <div className="field" style={{ marginBottom: 16 }}>
-          <label style={{ display: 'block', fontSize: 12, color: 'var(--text-secondary)', marginBottom: 7 }}>Date opened <span className="req" style={{ color: 'var(--red)' }}>*</span></label>
-          <input type="date" defaultValue="2026-07-07" style={{ width: '100%', background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 7, color: 'var(--text-primary)', fontFamily: 'var(--sans)', fontSize: 14, padding: '11px 13px' }} />
-        </div>
-      </div>
-      <div className="field" style={{ marginBottom: 16 }}>
-        <label style={{ display: 'block', fontSize: 12, color: 'var(--text-secondary)', marginBottom: 7 }}>Case title <span className="req" style={{ color: 'var(--red)' }}>*</span></label>
-        <input type="text" placeholder="Short descriptive title for this investigation" style={{ width: '100%', background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 7, color: 'var(--text-primary)', fontFamily: 'var(--sans)', fontSize: 14, padding: '11px 13px' }} />
-      </div>
-      <div className="field" style={{ marginBottom: 16 }}>
-        <label style={{ display: 'block', fontSize: 12, color: 'var(--text-secondary)', marginBottom: 7 }}>Case summary</label>
-        <textarea placeholder="Brief context — e.g. Suspected ransomware outbreak on DC-01, extracting memory via winpmem." style={{ resize: 'none', height: 76, width: '100%', background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 7, color: 'var(--text-primary)', fontFamily: 'var(--sans)', fontSize: 14, padding: '11px 13px' }}></textarea>
-      </div>
+      </nav>
 
-      <p className="section-label" style={{ fontFamily: 'var(--mono)', fontSize: 11, letterSpacing: 1.5, textTransform: 'uppercase', color: 'var(--text-tertiary)', margin: '0 0 16px', paddingTop: 8, borderTop: '1px solid var(--border-soft)' }}>Investigator</p>
-      <div className="field-row" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
-        <div className="field" style={{ marginBottom: 16 }}>
-          <label style={{ display: 'block', fontSize: 12, color: 'var(--text-secondary)', marginBottom: 7 }}>Consultant Name <span className="req" style={{ color: 'var(--red)' }}>*</span></label>
-          <input type="text" placeholder="Full name" style={{ width: '100%', background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 7, color: 'var(--text-primary)', fontFamily: 'var(--sans)', fontSize: 14, padding: '11px 13px' }} />
-        </div>
-        <div className="field" style={{ marginBottom: 16 }}>
-          <label style={{ display: 'block', fontSize: 12, color: 'var(--text-secondary)', marginBottom: 7 }}>MSP / Organization</label>
-          <input type="text" placeholder="e.g. Acme Cyber Defense" style={{ width: '100%', background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 7, color: 'var(--text-primary)', fontFamily: 'var(--sans)', fontSize: 14, padding: '11px 13px' }} />
-        </div>
-      </div>
-      <div className="field" style={{ marginBottom: 16 }}>
-        <label style={{ display: 'block', fontSize: 12, color: 'var(--text-secondary)', marginBottom: 7 }}>Operating System Profile</label>
-        <select style={{ appearance: 'none', backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'12\' height=\'8\'%3E%3Cpath d=\'M1 1l5 5 5-5\' stroke=\'%238B8B91\' stroke-width=\'1.5\' fill=\'none\'/%3E%3C/svg%3E")', backgroundRepeat: 'no-repeat', backgroundPosition: 'right 13px center', width: '100%', background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 7, color: 'var(--text-primary)', fontFamily: 'var(--sans)', fontSize: 14, padding: '11px 13px' }}>
-          <option>Windows (Auto-detect version)</option>
-          <option>Linux (Debian/Ubuntu)</option>
-          <option>Linux (RHEL/CentOS)</option>
-          <option>macOS</option>
-        </select>
-      </div>
-
-      <p className="section-label" style={{ fontFamily: 'var(--mono)', fontSize: 11, letterSpacing: 1.5, textTransform: 'uppercase', color: 'var(--text-tertiary)', margin: '0 0 16px', paddingTop: 8, borderTop: '1px solid var(--border-soft)' }}>Evidence</p>
-      <div className="field" style={{ marginBottom: 16 }}>
-        <label style={{ display: 'block', fontSize: 12, color: 'var(--text-secondary)', marginBottom: 7 }}>Upload Memory Dump <span className="req" style={{ color: 'var(--red)' }}>*</span></label>
-        <div className="upload-zone" style={{ border: '1.5px dashed var(--border)', borderRadius: 10, padding: '36px 20px', textAlign: 'center', background: 'var(--bg-surface)', marginTop: 6, cursor: 'pointer', transition: 'border-color .15s' }}>
-          <div className="upload-icon" style={{ width: 36, height: 36, margin: '0 auto 14px', border: '1.5px solid var(--text-tertiary)', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <svg viewBox="0 0 16 16" fill="none" style={{ width: 16, height: 16 }}><path d="M8 11V3M8 3L5 6M8 3l3 3" stroke="#8B8B91" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/><path d="M2.5 11v1.5A1.5 1.5 0 0 0 4 14h8a1.5 1.5 0 0 0 1.5-1.5V11" stroke="#8B8B91" strokeWidth="1.4" strokeLinecap="round"/></svg>
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_350px] gap-8">
+        {/* Main Intake Form */}
+        <div className="panel space-y-8">
+          <div>
+            <h2 className="text-xl font-semibold mb-1">Investigation Parameters</h2>
+            <p className="text-sm text-zinc-400">Define case details before proceeding to memory analysis.</p>
           </div>
-          <div className="upload-title" style={{ fontSize: 14, fontWeight: 500, marginBottom: 4 }}>Drop raw memory dump or click to browse</div>
-          <div className="upload-hint" style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>Processed locally via Volatility 3 on AMD Hardware</div>
-          <div className="upload-formats" style={{ fontFamily: 'var(--mono)', fontSize: 10, color: 'var(--text-tertiary)', marginTop: 10, letterSpacing: 0.5 }}>.RAW · .VMEM · .MEM · MAX 64GB</div>
-        </div>
-        <div className="file-chip" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--bg-raised)', border: '1px solid var(--border)', borderRadius: 7, padding: '10px 14px', marginTop: 10 }}>
-          <div className="file-chip-left" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div className="file-dot" style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--red)' }}></div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
-              <div className="file-name" style={{ fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--text-primary)' }}>win2019-dc01-suspect.raw</div>
-              <div className="file-size" style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>16.4 GB — Pending Volatility 3 Analysis</div>
+              <label className="block text-xs font-medium text-zinc-400 mb-1.5 uppercase tracking-wider">Case Designation</label>
+              <Input type="text" placeholder="e.g. OP-MIDNIGHT-SUN" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-zinc-400 mb-1.5 uppercase tracking-wider">Reference ID</label>
+              <Input type="text" placeholder="e.g. INC-2026-0881" />
             </div>
           </div>
-          <div className="file-remove" style={{ fontSize: 11, color: 'var(--text-tertiary)', cursor: 'pointer' }}>remove</div>
+
+          <div>
+            <label className="block text-xs font-medium text-zinc-400 mb-1.5 uppercase tracking-wider">Lead Investigator</label>
+            <Input type="text" placeholder="Analyst ID or Name" />
+          </div>
+
+          <div className="h-px bg-white/5 my-4"></div>
+
+          <div>
+            <h3 className="text-lg font-semibold mb-1">Evidence Source</h3>
+            <p className="text-sm text-zinc-400 mb-4">Provide the raw memory dump for Volatility 3 processing.</p>
+            
+            {/* File Upload Zone */}
+            <div className="upload-zone group">
+              <div className="upload-icon group-hover:scale-110 transition-transform duration-500 relative z-10">
+                <UploadCloud className="h-8 w-8 text-zinc-400 group-hover:text-[#9D00FF] transition-colors" />
+              </div>
+              <div className="text-lg font-medium mb-2 relative z-10 text-white">Drag & Drop Memory Dump</div>
+              <div className="text-sm text-zinc-500 relative z-10">Supports .raw, .mem, .img (Max 128GB)</div>
+              
+              {/* Fake hidden input for actual functionality if needed */}
+              <input type="file" className="absolute inset-0 opacity-0 cursor-pointer z-20" />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label className="block text-xs font-medium text-zinc-400 mb-1.5 uppercase tracking-wider">Target OS Profile</label>
+              <CustomSelect 
+                value={osProfile} 
+                onChange={setOsProfile}
+                options={[
+                  { label: "Auto-Detect (Volatility 3)", value: "auto" },
+                  { label: "Windows 10 / 11", value: "win10" },
+                  { label: "Windows 7", value: "win7" },
+                  { label: "Linux (Generic)", value: "linux" },
+                  { label: "macOS", value: "mac" }
+                ]}
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-zinc-400 mb-1.5 uppercase tracking-wider">Analysis Depth</label>
+              <CustomSelect 
+                value={analysisDepth} 
+                onChange={setAnalysisDepth}
+                options={[
+                  { label: "Quick Triage (Maelstrom)", value: "quick" },
+                  { label: "Standard Forensics", value: "standard" },
+                  { label: "Deep Inspection (Gemma 3 Assisted)", value: "deep" }
+                ]}
+              />
+            </div>
+          </div>
+
+          <div className="pt-4 flex justify-end">
+            <Link href="/memory-browser">
+              <Button variant="primary" size="lg">
+                Initialize Analysis Sequence
+              </Button>
+            </Link>
+          </div>
         </div>
-      </div>
 
-      <div className="footer-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 36, paddingTop: 24, borderTop: '1px solid var(--border-soft)' }}>
-        <div className="footer-note" style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>Case ID <span style={{ color: 'var(--red)' }}>CASE-INZ-104</span> will be generated on submit</div>
-        <Link href="/workspace" style={{ textDecoration: 'none' }}>
-          <button className="btn-primary">Begin Analysis →</button>
-        </Link>
-      </div>
+        {/* Sidebar Status */}
+        <div className="flex flex-col gap-6">
+          <div className="panel">
+            <div className="text-xs text-zinc-500 uppercase tracking-widest mb-6 font-mono font-bold flex items-center gap-2">
+              <Cpu className="h-4 w-4" /> Hardware Acceleration
+            </div>
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-2 h-2 rounded-full bg-[#9D00FF] shadow-[0_0_10px_#9D00FF] animate-pulse"></div>
+              <div className="text-sm font-medium">AMD Ryzen AI / NPU</div>
+              <div className="ml-auto text-xs text-[#9D00FF] font-mono tracking-wider">ACTIVE</div>
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="w-2 h-2 rounded-full bg-[#9D00FF] shadow-[0_0_10px_#9D00FF] animate-pulse"></div>
+              <div className="text-sm font-medium">Radeon RX GPU</div>
+              <div className="ml-auto text-xs text-[#9D00FF] font-mono tracking-wider">ACTIVE</div>
+            </div>
+          </div>
+          
+          <div className="panel relative overflow-hidden group">
+            <div className="absolute top-0 right-0 p-3 opacity-10">
+              <HardDrive className="h-24 w-24" />
+            </div>
+            <div className="text-xs text-zinc-500 uppercase tracking-widest mb-4 font-mono font-bold relative z-10">
+              LLM Copilot Status
+            </div>
+            <div className="text-sm text-zinc-400 leading-relaxed relative z-10">
+              <span className="text-[#D6A6FF] font-medium block mb-2">Gemma 3 (8B) Loaded</span>
+              Model is ready in VRAM to parse unstructured Volatility output and autonomously extract threat actor IOCs in real-time.
+            </div>
+          </div>
+        </div>
 
+      </div>
     </div>
   );
 }
