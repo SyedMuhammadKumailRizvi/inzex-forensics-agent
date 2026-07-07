@@ -36,7 +36,7 @@ export default function LoginPage() {
         setErrorMsg(error.message);
         setIsLoading(false);
       } else {
-        router.push("/history");
+        router.push("/");
         router.refresh();
       }
     } else {
@@ -98,7 +98,7 @@ export default function LoginPage() {
               const { error } = await supabase.auth.signInWithOAuth({
                 provider: 'google',
                 options: {
-                  redirectTo: `${window.location.origin}/history`
+                  redirectTo: `${window.location.origin}/auth/callback?next=/`
                 }
               });
               if (error) setErrorMsg(error.message);

@@ -20,7 +20,7 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
           type={type}
           className={cn(
             "flex h-12 w-full rounded-xl border border-[#202026] bg-[#0a0a0c]/80 px-4 py-2 text-sm text-[#FAFAFA] transition-all duration-300",
-            "placeholder:text-[#52525B] focus:border-[#9D00FF] focus:bg-[#121215] focus:outline-none focus:ring-1 focus:ring-[#9D00FF] focus:ring-offset-0 disabled:cursor-not-allowed disabled:opacity-50",
+            "placeholder:text-[#52525B] focus:border-white/20 focus:bg-[#121215] focus:outline-none focus:ring-0 disabled:cursor-not-allowed disabled:opacity-50",
             icon ? "pl-11" : "",
             className
           )}

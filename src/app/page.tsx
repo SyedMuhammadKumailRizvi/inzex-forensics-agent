@@ -17,50 +17,64 @@ export default function LandingPage() {
 
       {/* Hero Section */}
       <main className="flex-1 flex flex-col justify-center px-4 pt-20 pb-20 max-w-7xl mx-auto w-full relative z-10">
-        <div className="flex flex-col lg:flex-row items-center justify-between gap-12 lg:gap-20">
+        <div className="min-h-[calc(100vh-160px)] flex flex-col justify-between relative">
+          <div className="flex flex-col lg:flex-row items-center justify-between gap-12 lg:gap-20 pt-8 lg:pt-16">
+            {/* Left Text Column */}
+            <motion.div
+              initial={{ opacity: 0, y: 30 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.8 }}
+              className="flex-1 max-w-2xl z-10 text-center lg:text-left"
+            >
+              <h1 className="text-5xl sm:text-6xl md:text-7xl lg:text-[4.5rem] font-black tracking-tighter mb-8 leading-[1.1] text-white">
+                Autonomous <br />
+                Digital Forensics{' '}
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#9D00FF] via-[#D6A6FF] to-[#9D00FF] bg-[length:200%_auto] animate-[shimmer_4s_linear_infinite] whitespace-nowrap">
+                  & Incident Response
+                </span>
+              </h1>
+
+              <p className="text-lg md:text-xl text-zinc-400 max-w-xl mb-12 leading-relaxed font-light mx-auto lg:mx-0">
+                Accelerate threat hunting using the <span className="text-zinc-200 font-medium">AMD Developer Cloud</span>. Parse raw memory dumps into actionable intelligence instantly with our decoupled Unicorn Architecture.
+              </p>
+
+              <div className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-5">
+                <Link href="/case-intake">
+                  <Button variant="primary" size="lg" className="group w-full sm:w-auto text-base px-8 py-6 shadow-[0_0_20px_rgba(157,0,255,0.25)] hover:shadow-[0_0_40px_rgba(157,0,255,0.6)] transition-all duration-300 border border-[#9D00FF]/50 bg-[#9D00FF]/10 hover:bg-[#9D00FF]/20 backdrop-blur-md">
+                    Start Investigation 
+                    <ArrowRight className="ml-2 h-5 w-5 transform group-hover:translate-x-1.5 transition-transform" />
+                  </Button>
+                </Link>
+                <Link href="/feedback">
+                  <Button variant="outline" size="lg" className="w-full sm:w-auto text-base px-8 py-6 border-white/10 hover:border-white/30 hover:bg-white/5 text-zinc-300 transition-colors duration-300 backdrop-blur-md">
+                    <MessageSquare className="mr-2 h-5 w-5 opacity-70" /> Leave Feedback
+                  </Button>
+                </Link>
+              </div>
+            </motion.div>
+
+            {/* Right Animation Column */}
+            <motion.div
+              initial={{ opacity: 0, x: 40 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.8, delay: 0.2 }}
+              className="flex-1 w-full max-w-lg lg:max-w-none flex justify-center lg:justify-end"
+            >
+              <MemoryDumpAnimation />
+            </motion.div>
+          </div>
           
-          {/* Left Text Column */}
-          <motion.div
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, ease: "easeOut" }}
-            className="flex-1 text-left"
+          {/* Scroll Indicator Arrow */}
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 1.5, duration: 1 }}
+            className="flex justify-center w-full pb-8"
           >
-            <h1 className="text-6xl md:text-7xl lg:text-[5rem] font-black tracking-tight mb-8 text-white leading-[1.05]">
-              Autonomous <br />
-              Digital Forensics <br />
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#9D00FF] via-[#D6A6FF] to-[#9D00FF] bg-[length:200%_auto] animate-[shimmer_4s_linear_infinite]">
-                & Incident Response
-              </span>
-            </h1>
-
-            <p className="text-lg md:text-xl text-zinc-400 max-w-xl mb-12 leading-relaxed font-light">
-              Accelerate threat hunting using the <span className="text-zinc-200 font-medium">AMD Developer Cloud</span>. Parse raw memory dumps into actionable intelligence instantly with our decoupled Unicorn Architecture.
-            </p>
-
-            <div className="flex flex-col sm:flex-row items-center gap-5">
-              <Link href="/case-intake">
-                <Button variant="primary" size="lg" className="group w-full sm:w-auto text-base px-8 py-6 shadow-[0_0_20px_rgba(157,0,255,0.25)] hover:shadow-[0_0_40px_rgba(157,0,255,0.6)] transition-all duration-300 border border-[#9D00FF]/50 bg-[#9D00FF]/10 hover:bg-[#9D00FF]/20 backdrop-blur-md">
-                  Start Investigation 
-                  <ArrowRight className="ml-2 h-5 w-5 transform group-hover:translate-x-1.5 transition-transform" />
-                </Button>
-              </Link>
-              <Link href="/feedback">
-                <Button variant="outline" size="lg" className="w-full sm:w-auto text-base px-8 py-6 border-white/10 hover:border-white/30 hover:bg-white/5 text-zinc-300 transition-colors duration-300 backdrop-blur-md">
-                  <MessageSquare className="mr-2 h-5 w-5 opacity-70" /> Leave Feedback
-                </Button>
-              </Link>
+            <div className="flex flex-col items-center gap-2 animate-bounce text-zinc-500">
+              <span className="text-xs tracking-widest uppercase opacity-60">Scroll to Explore</span>
+              <ArrowDown className="h-5 w-5 text-[#9D00FF] drop-shadow-[0_0_8px_rgba(157,0,255,0.8)]" />
             </div>
-          </motion.div>
-
-          {/* Right Animation Column */}
-          <motion.div
-            initial={{ opacity: 0, x: 40 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.8, delay: 0.2 }}
-            className="flex-1 w-full max-w-lg lg:max-w-none flex justify-center lg:justify-end"
-          >
-            <MemoryDumpAnimation />
           </motion.div>
         </div>
 
