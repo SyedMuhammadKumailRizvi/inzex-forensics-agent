@@ -1,12 +1,15 @@
+export type OSHint = 'windows' | 'linux' | 'mac';
+export type CaseStatus = 'pending' | 'analyzing' | 'completed';
+export type UploadStatus = 'uploading' | 'complete' | 'failed';
+export type FindingSeverity = 'Critical' | 'High' | 'Medium' | 'Low' | 'Info';
+
 export interface Case {
   id: string;
-  case_number: string;
-  title: string;
-  summary: string | null;
-  investigator_name: string;
-  organization: string | null;
-  os_profile: string | null;
-  status: 'pending_upload' | 'analyzing' | 'review_pending' | 'completed';
+  case_designation: string;
+  reference_id: string | null;
+  lead_investigator: string | null;
+  os_hint: OSHint | null;
+  status: CaseStatus;
   created_at: string;
 }
 
@@ -14,9 +17,9 @@ export interface Evidence {
   id: string;
   case_id: string;
   file_name: string;
-  file_size: number;
   storage_path: string;
-  upload_status: 'uploading' | 'complete' | 'failed';
+  file_size_bytes: number;
+  upload_status: UploadStatus;
   created_at: string;
 }
 
@@ -24,19 +27,31 @@ export interface Finding {
   id: string;
   case_id: string;
   plugin_name: string;
-  technique: string | null;
-  confidence_score: number | null;
-  severity: 'Critical' | 'High' | 'Medium' | 'Low' | 'Info' | null;
+  mitre_technique: string | null;
+  severity: FindingSeverity | null;
   ai_rationale: string | null;
-  volatility_raw_output: string | null;
-  status: 'pending' | 'approved' | 'rejected';
+  volatility_raw_json: Record<string, any>; // Typed for JSONB compatibility
   created_at: string;
 }
 
-export interface FindingThread {
-  id: string;
-  finding_id: string;
-  author: 'analyst' | 'gemma_ai';
-  content: string;
-  created_at: string;
+export interface Database {
+  public: {
+    Tables: {
+      cases: {
+        Row: Case;
+        Insert: Omit<Case, 'id' | 'created_at'> & { id?: string; created_at?: string };
+        Update: Partial<Omit<Case, 'id'>>;
+      };
+      evidence: {
+        Row: Evidence;
+        Insert: Omit<Evidence, 'id' | 'created_at'> & { id?: string; created_at?: string };
+        Update: Partial<Omit<Evidence, 'id'>>;
+      };
+      findings: {
+        Row: Finding;
+        Insert: Omit<Finding, 'id' | 'created_at'> & { id?: string; created_at?: string };
+        Update: Partial<Omit<Finding, 'id'>>;
+      };
+    };
+  };
 }
