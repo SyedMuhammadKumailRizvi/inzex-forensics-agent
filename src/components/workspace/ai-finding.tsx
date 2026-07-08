@@ -1,12 +1,16 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Finding } from '@/types/database';
 import { AgenticLoop } from '../chat/agentic-loop';
+import { createClient } from '@/lib/supabase/client';
 
 interface AIFindingProps {
   finding: Finding | null;
 }
 
 export function AIFinding({ finding }: AIFindingProps) {
+  const [feedback, setFeedback] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
   if (!finding) {
     return (
       <div className="panel" style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 10, padding: 18, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}>
@@ -15,10 +19,31 @@ export function AIFinding({ finding }: AIFindingProps) {
     );
   }
 
+  const handleSubmitFeedback = async () => {
+    if (!feedback.trim()) return;
+    setSubmitting(true);
+    const supabase = createClient();
+    await supabase.from('cases').update({ status: 'analyzing' }).eq('id', finding.case_id);
+    await supabase.from('findings').update({ 
+      status: 'rechecking',
+      human_feedback: feedback
+    }).eq('id', finding.id);
+    setSubmitting(false);
+    setFeedback("");
+    // We would probably trigger a refetch here in a real app, 
+    // but for the MVP the worker will pick it up on next poll.
+    alert("Feedback submitted to the Unicorn Engine for re-evaluation.");
+  };
+
   return (
     <div className="panel" style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 10, padding: 18, display: 'flex', flexDirection: 'column' }}>
       <p className="panel-title" style={{ fontSize: 11, letterSpacing: 1.5, textTransform: 'uppercase', color: 'var(--text-tertiary)', margin: '0 0 3px' }}>Gemma 3 AI Inference</p>
-      <p className="panel-sub" style={{ fontSize: 13, color: 'var(--text-secondary)', margin: '0 0 16px' }}>Plugin: {finding.plugin_name}</p>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+        <p className="panel-sub" style={{ fontSize: 13, color: 'var(--text-secondary)', margin: 0 }}>Plugin: {finding.plugin_name}</p>
+        {finding.status === 'rechecking' && (
+          <span style={{ fontSize: 10, background: 'var(--amber-dim)', color: 'var(--amber)', padding: '3px 8px', borderRadius: 4, textTransform: 'uppercase', letterSpacing: 1 }}>Re-evaluating...</span>
+        )}
+      </div>
       
       {finding.technique && (
         <div className="finding-badge" style={{ display: 'inline-block', padding: '4px 8px', borderRadius: 4, fontFamily: 'var(--mono)', fontSize: 10, textTransform: 'uppercase', marginBottom: 12, background: '#251B33', color: '#A982ED', border: '1px solid #3B2A52', alignSelf: 'flex-start' }}>
@@ -41,8 +66,20 @@ export function AIFinding({ finding }: AIFindingProps) {
       </p>
       
       <div className="review-actions" style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 20, marginTop: 18 }}>
-        <button className="btn btn-confirm" style={{ fontFamily: 'var(--sans)', fontSize: 13, fontWeight: 500, padding: '9px 0', width: '100%', borderRadius: 6, border: '1px solid var(--red)', background: 'var(--red)', color: '#fff', cursor: 'pointer' }}>Approve / Add to Report</button>
-        <button className="btn btn-dismiss" style={{ fontFamily: 'var(--sans)', fontSize: 13, fontWeight: 500, padding: '9px 0', width: '100%', borderRadius: 6, border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-secondary)', cursor: 'pointer' }}>Reject / Dismiss</button>
+        <textarea 
+          placeholder="Notice an issue with the AI's logic? Enter feedback here to force a re-evaluation..." 
+          value={feedback}
+          onChange={(e) => setFeedback(e.target.value)}
+          style={{ width: '100%', minHeight: 80, background: 'var(--bg-raised)', border: '1px solid var(--border)', borderRadius: 6, padding: '10px 12px', color: 'var(--text-primary)', fontSize: 12, resize: 'vertical', outline: 'none', fontFamily: 'var(--sans)' }}
+        />
+        <button onClick={handleSubmitFeedback} disabled={submitting || !feedback.trim()} className="btn" style={{ fontFamily: 'var(--sans)', fontSize: 12, fontWeight: 500, padding: '8px 0', width: '100%', borderRadius: 6, border: '1px solid var(--red-glow)', background: 'var(--red-dim)', color: '#D6A6FF', cursor: (submitting || !feedback.trim()) ? 'not-allowed' : 'pointer', opacity: (submitting || !feedback.trim()) ? 0.5 : 1 }}>
+          {submitting ? 'Submitting...' : 'Submit to Engine for Re-evaluation'}
+        </button>
+      </div>
+      
+      <div className="review-actions" style={{ display: 'flex', gap: 8, marginTop: 'auto' }}>
+        <button className="btn btn-confirm" style={{ flex: 1, fontFamily: 'var(--sans)', fontSize: 13, fontWeight: 500, padding: '9px 0', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg-raised)', color: 'var(--text-secondary)', cursor: 'pointer' }}>Approve</button>
+        <button className="btn btn-dismiss" style={{ flex: 1, fontFamily: 'var(--sans)', fontSize: 13, fontWeight: 500, padding: '9px 0', borderRadius: 6, border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-tertiary)', cursor: 'pointer' }}>Dismiss</button>
       </div>
       
       <AgenticLoop />

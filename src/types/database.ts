@@ -23,6 +23,8 @@ export interface Evidence {
   created_at: string;
 }
 
+export type FindingStatus = 'pending' | 'approved' | 'rejected' | 'rechecking';
+
 export interface Finding {
   id: string;
   case_id: string;
@@ -31,6 +33,8 @@ export interface Finding {
   severity: FindingSeverity | null;
   ai_rationale: string | null;
   volatility_raw_json: Record<string, any>; // Typed for JSONB compatibility
+  status: FindingStatus;
+  human_feedback: string | null;
   created_at: string;
 }
 

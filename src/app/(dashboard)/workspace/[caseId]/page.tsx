@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import { EvidenceLog } from '@/components/workspace/evidence-log';
 import { AIFinding } from '@/components/workspace/ai-finding';
+import { ManualBrowser } from '@/components/workspace/manual-browser';
 import { Case, Finding, Evidence } from '@/types/database';
 
 export default function Workspace({ params }: { params: Promise<{ caseId: string }> }) {
@@ -14,6 +15,7 @@ export default function Workspace({ params }: { params: Promise<{ caseId: string
   const [evidence, setEvidence] = useState<Evidence | null>(null);
   const [findings, setFindings] = useState<Finding[]>([]);
   const [selectedFinding, setSelectedFinding] = useState<Finding | null>(null);
+  const [activeTab, setActiveTab] = useState<'ai-review' | 'manual-browser'>('ai-review');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -22,16 +24,15 @@ export default function Workspace({ params }: { params: Promise<{ caseId: string
       
       // Fetch Case
       const { data: caseRow } = await supabase
-        .from('Cases')
+        .from('cases')
         .select('*')
         .eq('id', caseId)
         .single();
         
       if (caseRow) setCaseData(caseRow as Case);
 
-      // Fetch Evidence
       const { data: evidenceRow } = await supabase
-        .from('Evidence')
+        .from('evidence')
         .select('*')
         .eq('case_id', caseId)
         .single();
@@ -40,7 +41,7 @@ export default function Workspace({ params }: { params: Promise<{ caseId: string
 
       // Fetch Findings
       const { data: findingsRows } = await supabase
-        .from('Findings')
+        .from('findings')
         .select('*')
         .eq('case_id', caseId)
         .order('created_at', { ascending: true });
@@ -98,8 +99,23 @@ export default function Workspace({ params }: { params: Promise<{ caseId: string
     return <div style={{ color: 'var(--red)', padding: 40 }}>Case not found or access denied.</div>;
   }
 
+  const handlePrint = () => {
+    window.print();
+  };
+
   return (
-    <div className="app">
+    <div className="app print-friendly">
+      <style dangerouslySetInnerHTML={{__html: `
+        @media print {
+          body { background: white !important; color: black !important; }
+          .app { padding: 0 !important; max-width: 100% !important; }
+          .footer-bar, .mode-toggle, textarea, button, .navbar { display: none !important; }
+          .workspace { display: block !important; }
+          .panel { background: white !important; border: 1px solid #ccc !important; margin-bottom: 20px; page-break-inside: avoid; }
+          * { color: black !important; }
+          .case-id span { color: #d00 !important; }
+        }
+      `}} />
       <div className="case-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', borderBottom: '1px solid var(--border)', paddingBottom: 20, marginBottom: 28 }}>
         <div>
           <div className="case-label" style={{ fontFamily: 'var(--mono)', fontSize: 11, letterSpacing: 2, color: 'var(--text-tertiary)', textTransform: 'uppercase', marginBottom: 8 }}>
@@ -126,10 +142,31 @@ export default function Workspace({ params }: { params: Promise<{ caseId: string
         </div>
       </div>
 
-      <div className="workspace" id="workspace" style={{ position: 'relative', display: 'grid', gridTemplateColumns: '280px 1fr 340px', gap: 20 }}>
-        <svg id="thread-svg" style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none', overflow: 'visible' }}>
-          <path id="thread-path" d="" style={{ fill: 'none', stroke: 'var(--red)', strokeWidth: 1.5, strokeDasharray: '6 4', opacity: 0.85 }} />
-        </svg>
+      <div className="top-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
+        <div style={{ flex: 1 }}></div>
+        <div className="mode-toggle" style={{ display: 'flex', border: '1px solid var(--border)', borderRadius: 7, overflow: 'hidden' }}>
+          <button 
+            onClick={() => setActiveTab('ai-review')}
+            className={`mode-btn ${activeTab === 'ai-review' ? 'active' : ''}`} 
+            style={{ fontFamily: 'var(--sans)', fontSize: 12, padding: '7px 16px', background: activeTab === 'ai-review' ? 'var(--red-dim)' : 'var(--bg-surface)', color: activeTab === 'ai-review' ? '#D6A6FF' : 'var(--text-secondary)', border: 'none', cursor: 'pointer' }}
+          >
+            Human Review Workspace
+          </button>
+          <button 
+            onClick={() => setActiveTab('manual-browser')}
+            className={`mode-btn ${activeTab === 'manual-browser' ? 'active' : ''}`} 
+            style={{ fontFamily: 'var(--sans)', fontSize: 12, padding: '7px 16px', background: activeTab === 'manual-browser' ? 'var(--red-dim)' : 'var(--bg-surface)', color: activeTab === 'manual-browser' ? '#D6A6FF' : 'var(--text-secondary)', border: 'none', cursor: 'pointer' }}
+          >
+            Process Browser
+          </button>
+        </div>
+      </div>
+
+      {activeTab === 'ai-review' ? (
+        <div className="workspace" id="workspace" style={{ position: 'relative', display: 'grid', gridTemplateColumns: '280px 1fr 340px', gap: 20 }}>
+          <svg id="thread-svg" style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none', overflow: 'visible' }}>
+            <path id="thread-path" d="" style={{ fill: 'none', stroke: 'var(--red)', strokeWidth: 1.5, strokeDasharray: '6 4', opacity: 0.85 }} />
+          </svg>
 
         <div className="panel" style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 10, padding: 18, display: 'flex', flexDirection: 'column' }}>
           <p className="panel-title" style={{ fontSize: 11, letterSpacing: 1.5, textTransform: 'uppercase', color: 'var(--text-tertiary)', margin: '0 0 3px' }}>Forensic Analysis Stages</p>
@@ -161,13 +198,13 @@ export default function Workspace({ params }: { params: Promise<{ caseId: string
         <EvidenceLog finding={selectedFinding} />
         <AIFinding finding={selectedFinding} />
 
-      </div>
+        </div>
+      ) : (
+        <ManualBrowser findings={findings} />
+      )}
 
       <div className="footer-bar" style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 24 }}>
-        <Link href="/memory-browser" style={{ textDecoration: 'none' }}>
-          <button className="btn-outline">Browse raw memory structures</button>
-        </Link>
-        <button className="btn-primary">Export JSON Report</button>
+        <button className="btn-primary" onClick={handlePrint}>Export PDF Report</button>
       </div>
 
     </div>

@@ -38,11 +38,11 @@ Our architecture bridges large memory dump handling, AMD accelerated computation
 ┌─────────────────────────────────────────────────────────────────────────┐
 │                      STATE & STORAGE TIER (SUPABASE)                    │
 │  - Storage Bucket: cridex.vmem (Secure file hosting)                    │
-│  - DB Tables: Cases, Findings, Finding_Threads (Chat context)           │
+│  - DB Tables: Cases, Evidence, Findings                                 │
 └──────┬───────────────────────────────────────────────────────────▲──────┘
        │ 2. AMD Worker polls for                                   │ 5. Writes JSON
-       │    new files OR new user                                  │    analysis &
-       │    comments to process                                    │    updated context
+       │    new files OR new cases                                 │    analysis &
+       │    to process                                             │    updated context
        ▼                                                           │
 ┌─────────────────────────────────────────────────────────────────────────┐
 │      🔥 THE UNICORN ENGINE (AMD DEVELOPER CLOUD - ROCm NOTEBOOK) 🔥     │
@@ -85,23 +85,45 @@ async def analyze_memory_forensics(volatility_output: str):
 
 ---
 
-## 🚀 Running the Permanent Infrastructure (Frontend)
+## 🚀 Running the Platform Locally (For Judges)
 
-To run the Next.js dashboard locally while the AMD node is polling:
+Because this repository is public, we have omitted our secret keys. To evaluate this project locally, you must provide your own Supabase and Fireworks AI credentials.
 
-1. Install dependencies:
+### 1. Database & Environment Setup
+1. Clone the repository and install frontend dependencies:
    ```bash
    npm install
    ```
-2. Configure `.env.local`:
-   ```env
-   NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
-   NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
-   ```
-3. Start the dev server:
+2. Rename or copy the example environment file:
    ```bash
-   npm run dev
+   cp .env.example .env.local
    ```
+3. Open `.env.local` and fill in your keys:
+   - `NEXT_PUBLIC_SUPABASE_URL` & `NEXT_PUBLIC_SUPABASE_ANON_KEY` (From Supabase API settings)
+   - `SUPABASE_SERVICE_KEY` (Needed for the Python worker to bypass RLS)
+   - `FIREWORKS_API_KEY` (Needed for Gemma 3 inference)
+4. Initialize the database by running the four SQL files located in `supabase/migrations/` sequentially in your Supabase SQL Editor.
+
+### 2. Start the Frontend (Next.js)
+Start the Next.js development server:
+```bash
+npm run dev
+```
+The dashboard will be available at `http://localhost:3000`.
+
+### 3. Start the Unicorn Engine (Python Worker)
+The stateless Python worker autonomously polls the database, runs Volatility 3, and inferences Gemma 3.
+1. Open a new terminal, navigate to the worker directory, and install dependencies:
+   ```bash
+   cd worker
+   pip install -r requirements.txt
+   ```
+2. Ensure you have Volatility 3 (`vol.py`) accessible in your environment.
+3. Start the worker:
+   ```bash
+   python inzex_engine.py
+   ```
+*Note: The worker uses `python-dotenv` to automatically look up and read your `.env.local` file.*
 
 ## 📦 Required Deliverables
 

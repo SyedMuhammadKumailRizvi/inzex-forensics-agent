@@ -8,6 +8,8 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { CustomSelect } from "@/components/ui/CustomSelect";
 
+import { createClient } from '@/lib/supabase/client';
+
 export default function CaseIntakePage() {
   const router = useRouter();
   
@@ -19,18 +21,44 @@ export default function CaseIntakePage() {
   const [analysisDepth, setAnalysisDepth] = useState("standard");
   const [isUploading, setIsUploading] = useState(false);
 
-  const handleInitialize = () => {
-    const payload = {
-      case_designation: caseDesignation || "Inzex-Alpha",
-      reference_id: referenceId || "REF-2026-001",
-      lead_investigator: leadInvestigator || "Syed Muhammad Kumail Rizvi",
-      target_os: osProfile,
-      analysis_depth: analysisDepth,
-      file_path: "storage/v1/object/public/vmem-dumps/cridex.vmem"
-    };
+  const handleInitialize = async () => {
+    setIsUploading(true);
+    const supabase = createClient();
     
-    console.log("Volatility 3 Payload Finalized:", JSON.stringify(payload, null, 2));
-    router.push("/memory-browser");
+    // 1. Create the Case
+    const { data: caseData, error: caseError } = await supabase
+      .from('cases')
+      .insert({
+        case_designation: caseDesignation || "Inzex-Alpha",
+        reference_id: referenceId || "REF-2026-001",
+        // Omit lead_investigator here because the DB expects a UUID (auth.users id) not a string name
+        os_hint: osProfile === 'auto' ? null : osProfile as any,
+        status: 'pending'
+      })
+      .select()
+      .single();
+
+    if (caseError || !caseData) {
+      console.error("Failed to create case:", caseError);
+      setIsUploading(false);
+      return;
+    }
+
+    // 2. Create the Evidence link
+    const { error: evidenceError } = await supabase
+      .from('evidence')
+      .insert({
+        case_id: caseData.id,
+        file_name: "cridex.vmem",
+        storage_path: "storage/v1/object/public/vmem-dumps/cridex.vmem",
+        file_size_bytes: 256000000,
+        upload_status: 'complete'
+      });
+      
+    setIsUploading(false);
+    
+    // 3. Navigate to the new integrated Workspace
+    router.push(`/workspace/${caseData.id}`);
   };
 
   return (

@@ -1,4 +1,4 @@
-# Human Review Workspace (`human_review_workspace.html`)
+# Human Review Workspace (`/workspace`)
 
 ## Overview
 This is the core dashboard of the Inzex Forensics platform. It embodies the "Human-in-the-Loop" philosophy, ensuring that AI-generated inferences from Gemma 3 are always auditable against the raw Volatility 3 forensic data.
@@ -14,11 +14,10 @@ This is the core dashboard of the Inzex Forensics platform. It embodies the "Hum
    - Draws an SVG spline connecting the selected hit line to the Gemma 3 panel on the right.
 
 3. **Right Panel - Gemma 3 AI Inference:**
-   - Displays the AI's conclusion based on the raw data (e.g., MITRE ATT&CK mapping, Confidence Score).
-   - Provides the rationale for the flag.
+   - Displays the AI's conclusion based on the raw data (e.g., MITRE ATT&CK mapping, Severity).
+   - Provides the rationale for the flag directly from the `ai_rationale` database column.
    - Contains crucial `Approve / Add to Report` and `Reject / Dismiss` action buttons.
 
 ## Data Flow
-- Receives structured JSON from the Python/Gemma backend.
-- Reads `Findings` from Supabase to populate the UI.
-- Actions taken on the right panel update the finding status in the database.
+- Reads strict JSONB payloads from the Supabase `findings` table via Next.js Server Actions.
+- Real-time hydration of the UI based on the Python worker's asynchronous processing.
