@@ -53,9 +53,9 @@ export function AIFinding({ finding }: AIFindingProps) {
         )}
       </div>
       
-      {finding.technique && (
+      {finding.mitre_technique && (
         <div className="finding-badge" style={{ display: 'inline-block', padding: '4px 8px', borderRadius: 4, fontFamily: 'var(--mono)', fontSize: 10, textTransform: 'uppercase', marginBottom: 12, background: '#251B33', color: '#A982ED', border: '1px solid #3B2A52', alignSelf: 'flex-start' }}>
-          Mitre ATT&CK // {finding.technique}
+          Mitre ATT&CK // {finding.mitre_technique}
         </div>
       )}
       
