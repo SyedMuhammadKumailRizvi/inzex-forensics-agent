@@ -23,6 +23,17 @@ export function AIFinding({ finding, onUpdate, onReevaluating }: AIFindingProps)
   const handleApprove = async () => {
     const supabase = createClient();
     await supabase.from('findings').update({ status: 'approved' }).eq('id', finding.id);
+    // Notify backend to clean up temp files
+    const amdBackendUrl = process.env.NEXT_PUBLIC_AMD_BACKEND_URL || "http://localhost:8000";
+    try {
+      await fetch(`${amdBackendUrl}/approve`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ case_id: finding.case_id })
+      });
+    } catch (err) {
+      console.error("Failed to notify backend for file cleanup:", err);
+    }
     if (onUpdate) onUpdate();
   };
 

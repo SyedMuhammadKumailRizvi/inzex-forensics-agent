@@ -44,8 +44,8 @@ export function Navbar() {
 
   return (
     <>
-      <div className="h-24 w-full shrink-0" aria-hidden="true" />
-      <div className="fixed top-0 left-0 right-0 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 z-50">
+      <div className="h-24 w-full shrink-0 hide-on-print" aria-hidden="true" />
+      <div className="fixed top-0 left-0 right-0 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 z-50 hide-on-print">
       <nav className="navbar flex justify-between items-center w-full rounded-2xl border border-white/5 bg-white/5 backdrop-blur-md">
         <Link href="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
           <Image

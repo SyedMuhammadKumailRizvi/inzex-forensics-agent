@@ -12,8 +12,8 @@ import { Case, Finding, Evidence } from '@/types/database';
 const PRINT_CSS = `
 @media print {
   @page { margin: 15mm; size: A4; }
-  body { background: #0a0a10 !important; color: #e0e0e0 !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-  .app { padding: 0 !important; max-width: 100% !important; background: #0a0a10 !important; }
+  body { background: #fff !important; color: #1a1a1a !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+  .app { padding: 0 !important; max-width: 100% !important; background: #fff !important; }
   .hide-on-print { display: none !important; }
   .print-only { display: block !important; }
   * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
@@ -271,85 +271,149 @@ export default function Workspace({ params }: { params: Promise<{ caseId: string
       {/* ─────────────────────────────────────────────────────
           PRINT-ONLY REPORT — Dark branded PDF
       ───────────────────────────────────────────────────── */}
-      <div className="print-only">
-        {/* Cover header */}
-        <div style={{ background: '#0f0f1a', border: '1px solid #2a1a40', borderRadius: 10, padding: '30px 36px', marginBottom: 24 }}>
-          <div style={{ fontFamily: 'monospace', fontSize: 10, letterSpacing: 4, textTransform: 'uppercase', color: '#9D00FF', marginBottom: 10 }}>
-            Inzex Forensics — Unicorn Engine
-          </div>
-          <h1 style={{ fontFamily: 'monospace', fontSize: 26, fontWeight: 700, color: '#ffffff', margin: '0 0 10px 0', textTransform: 'uppercase', letterSpacing: 2 }}>
-            Incident Report
-          </h1>
-          <div style={{ display: 'flex', gap: 40, marginTop: 16, flexWrap: 'wrap' }}>
-            {[
-              ['Case', caseData.case_designation],
-              ['Memory Source', evidence?.file_name || 'N/A'],
-              ['Analyst', caseData.lead_investigator || 'Unknown'],
-              ['Generated', new Date().toLocaleString()],
-              ['Findings', String(findings.length)],
-            ].map(([label, val]) => (
-              <div key={label}>
-                <div style={{ fontSize: 9, color: '#666', textTransform: 'uppercase', letterSpacing: 2, marginBottom: 4 }}>{label}</div>
-                <div style={{ fontFamily: 'monospace', fontSize: 13, color: '#e0e0e0' }}>{val}</div>
-              </div>
-            ))}
-          </div>
-        </div>
+      {/* ─────────────────────────────────────────────────────
+          PRINT-ONLY REPORT — Professional White Corporate PDF
+      ───────────────────────────────────────────────────── */}
+      <div className="print-only" style={{ fontFamily: "'Segoe UI', Arial, sans-serif", color: '#1a1a1a', lineHeight: 1.6 }}>
 
-        {/* Executive Summary */}
-        <div style={{ background: '#0f0f1a', border: '1px solid #1e1e2e', borderRadius: 10, padding: '20px 28px', marginBottom: 20 }}>
-          <p style={{ fontFamily: 'monospace', fontSize: 9, letterSpacing: 3, textTransform: 'uppercase', color: '#9D00FF', margin: '0 0 12px 0' }}>
-            Executive Summary
-          </p>
-          <p style={{ fontSize: 13, color: '#aaa', lineHeight: 1.7, margin: '0 0 14px 0' }}>
-            Memory forensics analysis of <strong style={{ color: '#e0e0e0' }}>{evidence?.file_name}</strong> identified <strong style={{ color: '#e0e0e0' }}>{findings.length}</strong> finding(s) requiring analyst review.
-          </p>
-          <ul style={{ margin: 0, padding: '0 0 0 18px', display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {findings.map((f, i) => (
-              <li key={i} style={{ fontSize: 13, color: '#bbb', lineHeight: 1.6 }}>
-                <strong style={{ color: f.severity === 'Critical' ? '#FF4444' : '#FF8C00' }}>[{f.severity}]</strong> — {f.mitre_technique || 'Memory Finding'} via <code style={{ fontFamily: 'monospace', fontSize: 11, color: '#A982ED', background: 'rgba(169,130,237,0.1)', padding: '1px 5px', borderRadius: 3 }}>{f.plugin_name}</code>
-              </li>
-            ))}
-          </ul>
-        </div>
-
-        {/* Per-finding detail cards */}
-        {findings.map((f, idx) => {
-          const sevColor = { Critical: '#FF4444', High: '#FF8C00', Medium: '#F5A623', Low: '#4CAF50', Info: '#64B5F6' }[f.severity || 'Info'] || '#888';
-          return (
-            <div key={f.id} style={{ background: '#0f0f1a', border: `1px solid #1e1e2e`, borderLeft: `3px solid ${sevColor}`, borderRadius: 10, padding: '20px 28px', marginBottom: 16, pageBreakInside: 'avoid' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14, borderBottom: '1px solid #1e1e2e', paddingBottom: 14 }}>
-                <div>
-                  <p style={{ fontFamily: 'monospace', fontSize: 10, letterSpacing: 2, color: '#555', textTransform: 'uppercase', margin: '0 0 5px 0' }}>
-                    Finding {idx + 1} — {f.plugin_name}
-                  </p>
-                  <p style={{ fontFamily: 'monospace', fontSize: 15, fontWeight: 600, color: '#fff', margin: 0 }}>
-                    {f.mitre_technique || 'Memory Analysis Finding'}
-                  </p>
-                </div>
-                <div style={{ display: 'flex', gap: 8, flexShrink: 0, marginLeft: 16, alignItems: 'center' }}>
-                  <span style={{ fontFamily: 'monospace', fontSize: 11, padding: '3px 10px', borderRadius: 4, color: sevColor, border: `1px solid ${sevColor}4D`, background: `${sevColor}1A` }}>{f.severity}</span>
-                  {f.status === 'approved' && (
-                    <span style={{ fontFamily: 'monospace', fontSize: 10, padding: '3px 10px', borderRadius: 4, color: '#4CAF50', border: '1px solid rgba(76,175,80,0.4)', background: 'rgba(76,175,80,0.1)' }}>✓ Approved</span>
-                  )}
-                </div>
-              </div>
-              <p style={{ fontFamily: 'monospace', fontSize: 9, letterSpacing: 2, textTransform: 'uppercase', color: '#555', margin: '0 0 8px 0' }}>AI Rationale</p>
-              <p style={{ fontSize: 13, lineHeight: 1.7, color: '#bbb', margin: 0 }}>{f.ai_rationale || 'No rationale available.'}</p>
-              {f.human_feedback && (
-                <div style={{ marginTop: 14, padding: '10px 14px', background: '#14141f', border: '1px solid #2a2a3a', borderRadius: 6 }}>
-                  <p style={{ fontFamily: 'monospace', fontSize: 9, letterSpacing: 2, textTransform: 'uppercase', color: '#555', margin: '0 0 6px 0' }}>Analyst Feedback</p>
-                  <p style={{ fontSize: 12, lineHeight: 1.6, color: '#999', margin: 0, fontStyle: 'italic' }}>"{f.human_feedback}"</p>
-                </div>
-              )}
+        {/* ── Report Cover Header ── */}
+        <div style={{ borderBottom: '3px solid #9D00FF', paddingBottom: 24, marginBottom: 28 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <div>
+              <p style={{ fontFamily: 'monospace', fontSize: 11, letterSpacing: 3, textTransform: 'uppercase', color: '#9D00FF', margin: '0 0 6px 0', fontWeight: 600 }}>
+                Inzex Forensics — Unicorn Engine
+              </p>
+              <h1 style={{ fontSize: 28, fontWeight: 800, margin: '0 0 4px 0', color: '#111', textTransform: 'uppercase', letterSpacing: 1 }}>
+                Memory Forensics Incident Report
+              </h1>
+              <p style={{ fontSize: 12, color: '#666', margin: 0 }}>
+                Confidential — For Authorized Personnel Only
+              </p>
             </div>
-          );
-        })}
+            <div style={{ textAlign: 'right', fontSize: 11, color: '#888', lineHeight: 1.8 }}>
+              <p style={{ margin: 0 }}>Generated: {new Date().toLocaleString()}</p>
+              <p style={{ margin: 0 }}>Engine: Volatility 3 + Gemma 4</p>
+              <p style={{ margin: 0 }}>Platform: AMD ROCm Accelerated</p>
+            </div>
+          </div>
+        </div>
 
-        {/* Footer */}
-        <div style={{ marginTop: 32, textAlign: 'center', borderTop: '1px solid #1e1e2e', paddingTop: 16 }}>
-          <p style={{ fontFamily: 'monospace', fontSize: 10, color: '#444', letterSpacing: 2, textTransform: 'uppercase' }}>
-            Generated by Inzex Forensics Unicorn Engine — AMD ROCm · Volatility 3 · Gemma 4
+        {/* ── Case Metadata Grid ── */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 16, marginBottom: 28, padding: '16px 20px', background: '#f8f8fa', border: '1px solid #e5e5ea', borderRadius: 8 }}>
+          {[
+            ['Case Designation', caseData.case_designation],
+            ['Memory Source', evidence?.file_name || 'N/A'],
+            ['Lead Investigator', caseData.lead_investigator || 'Unknown'],
+            ['Total Findings', String(findings.length)],
+          ].map(([label, val]) => (
+            <div key={label}>
+              <p style={{ fontSize: 9, textTransform: 'uppercase', letterSpacing: 2, color: '#999', margin: '0 0 4px 0', fontWeight: 600 }}>{label}</p>
+              <p style={{ fontSize: 13, fontWeight: 600, color: '#222', margin: 0 }}>{val}</p>
+            </div>
+          ))}
+        </div>
+
+        {/* ── Two-Column: Executive Summary + Key Findings ── */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 28 }}>
+          {/* Left: Executive Summary */}
+          <div style={{ padding: '16px 20px', background: '#f8f8fa', border: '1px solid #e5e5ea', borderRadius: 8 }}>
+            <p style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 2, color: '#9D00FF', fontWeight: 700, margin: '0 0 10px 0', borderBottom: '1px solid #e5e5ea', paddingBottom: 8 }}>
+              Executive Summary
+            </p>
+            <p style={{ fontSize: 12, color: '#444', lineHeight: 1.7, margin: 0 }}>
+              Memory forensics analysis of <strong>{evidence?.file_name}</strong> identified <strong>{findings.length}</strong> finding{findings.length !== 1 ? 's' : ''} requiring analyst review.
+              {findings.filter(f => f.severity === 'Critical').length > 0 && (
+                <> <strong style={{ color: '#d32f2f' }}>{findings.filter(f => f.severity === 'Critical').length} critical-severity</strong> finding{findings.filter(f => f.severity === 'Critical').length !== 1 ? 's were' : ' was'} detected.</>
+              )}
+              {findings.length === 0 && ' No anomalies were detected — the memory image appears clean.'}
+            </p>
+          </div>
+
+          {/* Right: Key Findings Bullet Points */}
+          <div style={{ padding: '16px 20px', background: '#f8f8fa', border: '1px solid #e5e5ea', borderRadius: 8 }}>
+            <p style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 2, color: '#9D00FF', fontWeight: 700, margin: '0 0 10px 0', borderBottom: '1px solid #e5e5ea', paddingBottom: 8 }}>
+              Key Findings at a Glance
+            </p>
+            {findings.length === 0 ? (
+              <p style={{ fontSize: 12, color: '#888', margin: 0 }}>No threats identified.</p>
+            ) : (
+              <ul style={{ margin: 0, padding: '0 0 0 16px', listStyleType: 'disc' }}>
+                {findings.map((f, i) => (
+                  <li key={i} style={{ fontSize: 12, color: '#444', lineHeight: 1.6, marginBottom: 4 }}>
+                    <strong style={{ color: f.severity === 'Critical' ? '#d32f2f' : f.severity === 'High' ? '#e65100' : '#555' }}>
+                      [{f.severity}]
+                    </strong>{' '}
+                    {f.mitre_technique || 'Memory anomaly'} — {f.plugin_name}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
+
+        {/* ── Detailed Findings ── */}
+        <div style={{ marginBottom: 20 }}>
+          <p style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 2, color: '#9D00FF', fontWeight: 700, margin: '0 0 16px 0', borderBottom: '2px solid #9D00FF', paddingBottom: 8, display: 'inline-block' }}>
+            Detailed Finding Analysis
+          </p>
+        </div>
+
+        {findings.length === 0 ? (
+          <div style={{ padding: '20px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 8, textAlign: 'center' }}>
+            <p style={{ fontSize: 14, color: '#166534', fontWeight: 600, margin: 0 }}>✓ No threats detected — Memory image is clean</p>
+          </div>
+        ) : (
+          findings.map((f, idx) => {
+            const sevColor = { Critical: '#d32f2f', High: '#e65100', Medium: '#f57c00', Low: '#2e7d32', Info: '#1976d2' }[f.severity || 'Info'] || '#666';
+            return (
+              <div key={f.id} style={{ border: '1px solid #e5e5ea', borderLeft: `4px solid ${sevColor}`, borderRadius: 8, padding: '18px 22px', marginBottom: 16, pageBreakInside: 'avoid', background: '#fff' }}>
+                {/* Finding header */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12, borderBottom: '1px solid #f0f0f0', paddingBottom: 12 }}>
+                  <div>
+                    <p style={{ fontSize: 10, letterSpacing: 2, color: '#999', textTransform: 'uppercase', margin: '0 0 4px 0', fontWeight: 600 }}>
+                      Finding {idx + 1} — {f.plugin_name}
+                    </p>
+                    <p style={{ fontSize: 16, fontWeight: 700, color: '#111', margin: 0 }}>
+                      {f.mitre_technique || 'Memory Analysis Finding'}
+                    </p>
+                  </div>
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0 }}>
+                    <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 4, color: '#fff', background: sevColor }}>
+                      {f.severity}
+                    </span>
+                    {f.status === 'approved' && (
+                      <span style={{ fontSize: 10, fontWeight: 600, padding: '3px 10px', borderRadius: 4, color: '#2e7d32', background: '#e8f5e9', border: '1px solid #c8e6c9' }}>
+                        ✓ Approved
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* AI Rationale */}
+                <div style={{ marginBottom: f.human_feedback ? 14 : 0 }}>
+                  <p style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 2, color: '#999', fontWeight: 600, margin: '0 0 6px 0' }}>AI Analysis</p>
+                  <p style={{ fontSize: 13, lineHeight: 1.7, color: '#333', margin: 0 }}>{f.ai_rationale || 'No analysis available.'}</p>
+                </div>
+
+                {/* Analyst Feedback */}
+                {f.human_feedback && (
+                  <div style={{ marginTop: 12, padding: '10px 14px', background: '#f8f8fa', borderLeft: '3px solid #9D00FF', borderRadius: '0 6px 6px 0' }}>
+                    <p style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 2, color: '#999', fontWeight: 600, margin: '0 0 4px 0' }}>Analyst Feedback</p>
+                    <p style={{ fontSize: 12, lineHeight: 1.6, color: '#555', margin: 0, fontStyle: 'italic' }}>"{f.human_feedback}"</p>
+                  </div>
+                )}
+              </div>
+            );
+          })
+        )}
+
+        {/* ── Footer ── */}
+        <div style={{ marginTop: 40, paddingTop: 16, borderTop: '2px solid #e5e5ea', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <p style={{ fontSize: 10, color: '#aaa', margin: 0 }}>
+            Inzex Forensics — Unicorn Engine • AMD ROCm • Volatility 3 • Gemma 4
+          </p>
+          <p style={{ fontSize: 10, color: '#aaa', margin: 0 }}>
+            Page 1 of 1 • {new Date().toLocaleDateString()}
           </p>
         </div>
       </div>

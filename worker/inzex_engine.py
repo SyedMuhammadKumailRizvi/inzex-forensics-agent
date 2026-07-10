@@ -89,7 +89,7 @@ VOLATILITY_PLUGINS = [
     "windows.cmdline",
 ]
 
-def run_volatility_plugin(file_path: str, filename: str, plugin: str) -> dict:
+def run_volatility_plugin(file_path: str, plugin: str) -> dict:
     """Run one Volatility 3 plugin against file_path. Returns structured dict."""
     try:
         cmd = ["python3", "vol.py", "-f", file_path, plugin, "--json"]
@@ -100,36 +100,13 @@ def run_volatility_plugin(file_path: str, filename: str, plugin: str) -> dict:
                 rows = json.loads(result.stdout)
             except json.JSONDecodeError:
                 rows = [{"raw": line} for line in result.stdout.splitlines() if line.strip()]
-        
-        # MOCK INJECTION FOR HACKATHON: Only if we are testing the dummy file!
-        if (not rows or len(rows) == 0) and filename == "dummy_evidence.vmem":
-            if plugin == "windows.netscan":
-                rows = [{"LocalAddr": "192.168.1.105", "LocalPort": 49152, "ForeignAddr": "182.191.83.69", "ForeignPort": 443, "State": "ESTABLISHED", "PID": 4124, "Owner": "svchost.exe"}]
-            elif plugin == "windows.malfind":
-                rows = [{"PID": 4124, "Process": "svchost.exe", "Start": "0x10000000", "End": "0x10004000", "Protection": "PAGE_EXECUTE_READWRITE", "Hexdump": "4D 5A 90 00 03 00 ...MZ."}]
-            elif plugin == "windows.pslist":
-                rows = [{"PID": 4124, "PPID": 600, "ImageFileName": "svchost.exe", "Offset": "0x80000000"}]
-            elif plugin == "windows.cmdline":
-                rows = [{"PID": 4124, "Process": "svchost.exe", "Args": "svchost.exe -k netsvcs -p -s BITS"}]
-
         return {"plugin": plugin, "rows": rows, "anomalies": []}
     except subprocess.TimeoutExpired:
         print(f"[-] Plugin {plugin} timed out.")
         return {"plugin": plugin, "rows": [], "anomalies": ["TIMEOUT"]}
     except Exception as e:
         print(f"[-] Plugin {plugin} failed: {e}")
-        # Inject mock data even on failure
-        rows = []
-        if filename == "dummy_evidence.vmem":
-            if plugin == "windows.netscan":
-                rows = [{"LocalAddr": "192.168.1.105", "LocalPort": 49152, "ForeignAddr": "182.191.83.69", "ForeignPort": 443, "State": "ESTABLISHED", "PID": 4124, "Owner": "svchost.exe"}]
-            elif plugin == "windows.malfind":
-                rows = [{"PID": 4124, "Process": "svchost.exe", "Start": "0x10000000", "End": "0x10004000", "Protection": "PAGE_EXECUTE_READWRITE", "Hexdump": "4D 5A 90 00 03 00 ...MZ."}]
-            elif plugin == "windows.pslist":
-                rows = [{"PID": 4124, "PPID": 600, "ImageFileName": "svchost.exe", "Offset": "0x80000000"}]
-            elif plugin == "windows.cmdline":
-                rows = [{"PID": 4124, "Process": "svchost.exe", "Args": "svchost.exe -k netsvcs -p -s BITS"}]
-        return {"plugin": plugin, "rows": rows, "anomalies": [str(e)]}
+        return {"plugin": plugin, "rows": [], "anomalies": [str(e)]}
 
 # ---------------------------------------------------------------------------
 # Gemma 3 / AI Inference
@@ -137,7 +114,10 @@ def run_volatility_plugin(file_path: str, filename: str, plugin: str) -> dict:
 SYSTEM_PROMPT = (
     "You are a Senior SOC Analyst performing memory forensics. "
     "Analyze the following Volatility 3 output and produce a structured incident report.\n\n"
-    "For each finding return:\n"
+    "IMPORTANT: Be honest and accurate. If the memory image shows NO signs of compromise, "
+    "return an empty findings array and state that in the threat_narrative. "
+    "Do NOT fabricate or invent findings. Only report genuine anomalies you observe in the data.\n\n"
+    "For each genuine finding return:\n"
     "{\n"
     '  "findings": [\n'
     "    {\n"
@@ -150,7 +130,7 @@ SYSTEM_PROMPT = (
     '      "evidence_line": "exact line from volatility output"\n'
     "    }\n"
     "  ],\n"
-    '  "threat_narrative": "string",\n'
+    '  "threat_narrative": "string — overall summary of the threat landscape or confirmation of clean state",\n'
     '  "threat_actor_hypothesis": "string"\n'
     "}\n\n"
     "Return only valid JSON. No markdown. No explanation."
@@ -214,21 +194,11 @@ async def analyze_with_ai(volatility_results: list[dict], human_feedback: Option
         except Exception as e2:
             print(f"[-] Fireworks fallback also failed: {e2}")
 
-    # --- Mock (no AI available) ---
+    # --- No AI available ---
     return {
-        "findings": [
-            {
-                "title": "MOCK: Process Injection Detected",
-                "description": "AI inference unavailable — mock finding inserted for pipeline testing.",
-                "mitre_technique_id": "T1055",
-                "mitre_technique_name": "Process Injection",
-                "confidence": "low",
-                "evidence_plugin": "windows.malfind",
-                "evidence_line": "N/A",
-            }
-        ],
-        "threat_narrative": "MOCK NARRATIVE — No AI engine available during this run.",
-        "threat_actor_hypothesis": "Unknown",
+        "findings": [],
+        "threat_narrative": "AI analysis could not be completed. Both vLLM (local GPU) and Fireworks API were unreachable. Please check GPU memory or FIREWORKS_API_KEY.",
+        "threat_actor_hypothesis": "N/A — AI engine unavailable",
     }
 
 # ---------------------------------------------------------------------------
@@ -296,7 +266,7 @@ async def run_pipeline_background(case_id: str, file_infos: list[dict]):
             try:
                 for plugin in VOLATILITY_PLUGINS:
                     print(f"[*] Running {plugin} on {filename}...")
-                    result = run_volatility_plugin(tmp_path, filename, plugin)
+                    result = run_volatility_plugin(tmp_path, plugin)
                     result["source_file"] = filename
                     plugin_results.append(result)
                     
@@ -385,20 +355,63 @@ async def reevaluate(req: ReevaluateRequest, background_tasks: BackgroundTasks):
             
             # run AI
             ai_report = await analyze_with_ai([raw_json], human_feedback=feedback)
-            finding_data = ai_report.get("findings", [])[0] if ai_report.get("findings") else {}
+            findings_list = ai_report.get("findings", [])
             
-            # update
+            # Guard: if AI returned no findings (engine unavailable), don't overwrite
+            if not findings_list:
+                print(f"[-] Reevaluation returned no findings (AI likely unavailable). Preserving original.")
+                supabase.table("findings").update({
+                    "status": "completed",
+                    "human_feedback": feedback
+                }).eq("id", finding_id).execute()
+                return
+            
+            finding_data = findings_list[0]
+            
+            # update with real AI output
             supabase.table("findings").update({
                 "severity": _confidence_to_severity(finding_data.get("confidence", "low")),
                 "ai_rationale": finding_data.get("description", "Re-evaluation complete."),
+                "mitre_technique": f"{finding_data.get('mitre_technique_id', '')} {finding_data.get('mitre_technique_name', '')}".strip(),
                 "status": "completed",
                 "human_feedback": feedback
             }).eq("id", finding_id).execute()
+            print(f"[+] Reevaluation complete for finding {finding_id}")
         except Exception as e:
             print(f"[-] Reevaluation failed: {e}")
+            # Set status back to completed so UI doesn't hang on rechecking
+            try:
+                supabase.table("findings").update({"status": "completed", "human_feedback": feedback}).eq("id", finding_id).execute()
+            except: pass
 
     background_tasks.add_task(bg_reevaluate, req.finding_id, req.human_feedback)
     return {"status": "processing"}
+
+
+class ApproveRequest(BaseModel):
+    case_id: str
+
+@app.post("/approve")
+async def approve_case(req: ApproveRequest):
+    """Delete temp evidence files from disk after analyst approval."""
+    try:
+        resp = supabase.table("evidence").select("storage_path").eq("case_id", req.case_id).execute()
+        deleted = []
+        for row in (resp.data or []):
+            path = row.get("storage_path", "")
+            if path and os.path.exists(path):
+                os.remove(path)
+                # Also try to remove the parent temp dir
+                parent = os.path.dirname(path)
+                if parent and os.path.isdir(parent):
+                    try: os.rmdir(parent)
+                    except: pass
+                deleted.append(path)
+                print(f"[+] Deleted evidence file: {path}")
+        return {"deleted": len(deleted), "paths": deleted}
+    except Exception as e:
+        print(f"[-] Approve/cleanup failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get("/status/{case_id}")
