@@ -186,7 +186,7 @@ export default function Workspace({ params }: { params: Promise<{ caseId: string
                 <div className="stage-top" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
                   <span className="stage-num" style={{ fontFamily: 'var(--mono)', fontSize: 11, color: selectedFinding?.id === f.id ? '#C58AFF' : 'var(--text-tertiary)' }}>{f.plugin_name}</span>
                 </div>
-                <p className="stage-name" style={{ fontSize: 14, fontWeight: 500, margin: '0 0 4px' }}>{f.technique || 'Analysis'}</p>
+                <p className="stage-name" style={{ fontSize: 14, fontWeight: 500, margin: '0 0 4px' }}>{f.mitre_technique || 'Analysis'}</p>
                 <div className="stage-conf-row" style={{ display: 'flex', alignItems: 'center', fontSize: 11, color: 'var(--text-tertiary)', marginTop: 8 }}>
                   <span className={`confidence-dot ${f.severity === 'Critical' ? 'dot-high' : 'dot-medium'}`} style={{ width: 8, height: 8, borderRadius: '50%', display: 'inline-block', marginRight: 6, background: f.severity === 'Critical' ? 'var(--red)' : 'var(--amber)' }}></span>
                   {f.severity} severity
