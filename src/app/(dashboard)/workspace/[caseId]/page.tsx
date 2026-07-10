@@ -18,46 +18,61 @@ export default function Workspace({ params }: { params: Promise<{ caseId: string
   const [activeTab, setActiveTab] = useState<'ai-review' | 'manual-browser'>('ai-review');
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const fetchData = async () => {
-      const supabase = createClient();
+  const fetchData = async () => {
+    const supabase = createClient();
+    
+    // Fetch Case
+    const { data: caseRow } = await supabase
+      .from('cases')
+      .select('*')
+      .eq('id', caseId)
+      .single();
       
-      // Fetch Case
-      const { data: caseRow } = await supabase
-        .from('cases')
-        .select('*')
-        .eq('id', caseId)
-        .single();
-        
-      if (caseRow) setCaseData(caseRow as Case);
+    if (caseRow) setCaseData(caseRow as Case);
 
-      const { data: evidenceRows } = await supabase
-        .from('evidence')
-        .select('*')
-        .eq('case_id', caseId);
-        
-      if (evidenceRows && evidenceRows.length > 0) {
-        setEvidence(evidenceRows[0] as Evidence);
-      }
+    const { data: evidenceRows } = await supabase
+      .from('evidence')
+      .select('*')
+      .eq('case_id', caseId);
+      
+    if (evidenceRows && evidenceRows.length > 0) {
+      setEvidence(evidenceRows[0] as Evidence);
+    }
 
-      // Fetch Findings
-      const { data: findingsRows } = await supabase
-        .from('findings')
-        .select('*')
-        .eq('case_id', caseId)
-        .order('created_at', { ascending: true });
-        
-      if (findingsRows) {
-        setFindings(findingsRows as Finding[]);
-        if (findingsRows.length > 0) {
-          setSelectedFinding(findingsRows[0] as Finding);
-        }
-      }
+    // Fetch Findings
+    const { data: findingsRows } = await supabase
+      .from('findings')
+      .select('*')
+      .eq('case_id', caseId)
+      .order('created_at', { ascending: true });
+      
+    if (findingsRows) {
+      setFindings(findingsRows as Finding[]);
+      
+      // Update selected finding to preserve state
+      setSelectedFinding(prev => {
+        if (!prev) return findingsRows.length > 0 ? findingsRows[0] as Finding : null;
+        const updated = findingsRows.find(f => f.id === prev.id);
+        return updated ? (updated as Finding) : prev;
+      });
+    }
 
-      setLoading(false);
-    };
+    setLoading(false);
+  };
 
+  useEffect(() => {
     fetchData();
+
+    // Setup polling if any finding is rechecking
+    const interval = setInterval(() => {
+      setFindings(currentFindings => {
+        const needsPolling = currentFindings.some(f => f.status === 'rechecking');
+        if (needsPolling) fetchData();
+        return currentFindings;
+      });
+    }, 3000);
+
+    return () => clearInterval(interval);
   }, [caseId]);
 
   useEffect(() => {
@@ -197,7 +212,7 @@ export default function Workspace({ params }: { params: Promise<{ caseId: string
         </div>
 
         <EvidenceLog finding={selectedFinding} />
-        <AIFinding finding={selectedFinding} />
+        <AIFinding finding={selectedFinding} onUpdate={fetchData} />
 
         </div>
       ) : (

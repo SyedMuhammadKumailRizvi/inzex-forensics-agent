@@ -349,7 +349,7 @@ async def analyze(
         raise HTTPException(status_code=500, detail=str(e))
 
 class ReevaluateRequest(BaseModel):
-    finding_id: int
+    finding_id: str
     human_feedback: str
 
 @app.post("/reevaluate")
