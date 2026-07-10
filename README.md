@@ -13,11 +13,14 @@ Inzex Forensics is an AI-gated memory forensics platform targeting B2B SaaS for 
 This project was specifically engineered to meet the requirements of **Track 3 (Unicorn)** and target the **$2,000 Best AMD-Hosted Gemma Project Bounty**.
 
 ### Meeting the AMD Compute Mandate
-To satisfy the automated pre-screening criteria, our architecture strictly relies on the **AMD Developer Cloud (ROCm 7.2 + vLLM 0.16.0 + PyTorch 2.9)** for heavy computation. 
+To satisfy the automated pre-screening criteria, our architecture strictly relies on the **AMD Developer Cloud (ROCm 7.2 + vLLM 0.16.0 + PyTorch 2.9)** for heavy computation.
 
-Because the AMD Developer Cloud environment is ephemeral (limited to a strict 4-hour uptime window), **we developed a highly decoupled architecture.** The Next.js frontend and Supabase database act as our permanent, persistent cloud infrastructure, while the AMD Jupyter Notebook acts as a powerful, stateless worker node that polls for tasks, processes them natively, and shuts down.
+The Next.js frontend and Supabase database act as permanent, persistent cloud infrastructure. The AMD ROCm instance runs a **synchronous FastAPI server** that accepts memory dump uploads, runs Volatility 3, inferences Gemma 3, and writes only the structured findings back to Supabase — raw evidence never leaves the AMD environment.
 
 *(Note: In accordance with Track 3 rules, no Docker container is used for the backend deployment).*
+
+> **🔒 Evidence Privacy Guarantee**
+> Raw memory dumps are processed in an isolated temp directory on the AMD instance and are permanently deleted immediately after Volatility 3 completes. Only the structured findings JSON is persisted to Supabase.
 
 ---
 
@@ -28,27 +31,36 @@ Our architecture bridges large memory dump handling, AMD accelerated computation
 ```text
 ┌─────────────────────────────────────────────────────────────────────────┐
 │                           CLIENT TIER (NEXT.JS)                         │
-│  UI: Server-Side Rendered Dashboard (Dark Mode / Cyberpunk Aesthetic)   │
-│  Features: File Upload API, Human Review Workspace, AI Chat Interface   │
-└──────┬───────────────────────────────────────────────────────────▲──────┘
-       │ 1. Uploads .vmem via API &                                │ 6. Live updates:
-       │    Submits user comments for                              │    Threat Reports
-       │    re-evaluation                                          │    & AI Replies
-       ▼                                                           │
+│   UI: Server-Side Rendered Dashboard (Dark Mode / Cyberpunk Aesthetic)  │
+│   Features: Direct .vmem Upload, Human Review Workspace, PDF Report     │
+└──────┬─────────────────────────────────────────────────────────▲────────┘
+       │ 1. POST /analyze                                         │ 4. Reads findings
+       │    multipart .vmem + case metadata                       │    from Supabase
+       │    (direct to AMD — no Supabase Storage)                 │    to populate
+       ▼                                                          │    workspace UI
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                      STATE & STORAGE TIER (SUPABASE)                    │
-│  - Storage Bucket: cridex.vmem (Secure file hosting)                    │
-│  - DB Tables: Cases, Evidence, Findings                                 │
-└──────┬───────────────────────────────────────────────────────────▲──────┘
-       │ 2. AMD Worker polls for                                   │ 5. Writes JSON
-       │    new files OR new cases                                 │    analysis &
-       │    to process                                             │    updated context
-       ▼                                                           │
+│      🔥 THE UNICORN ENGINE (AMD DEVELOPER CLOUD — ROCm FastAPI) 🔥      │
+│                                                                         │
+│  [1] Save .vmem  →  temp dir (isolated, never uploaded to any cloud)    │
+│  [2] Volatility 3 (CPU): pslist → netscan → malfind → cmdline           │
+│  [3] os.unlink() — temp file deleted IMMEDIATELY after plugins finish   │
+│  [4] Gemma 3 8B (ROCm GPU via vLLM): structured JSON threat report      │
+│  [5] Write findings JSON to Supabase cases/findings tables              │
+│  [6] Return { case_id } to frontend → redirect to workspace             │
+│                                                                         │
+│  Endpoints:  POST /analyze   GET /status/{case_id}   GET /health        │
+└──────────────────────────────────────────────────────────┬──────────────┘
+                                                           │ 3. Writes structured
+                                                           │    findings JSON only
+                                                           ▼
 ┌─────────────────────────────────────────────────────────────────────────┐
-│      🔥 THE UNICORN ENGINE (AMD DEVELOPER CLOUD - ROCm NOTEBOOK) 🔥     │
-│  Python FastAPI app runs Volatility 3 (CPU) & Google Gemma 3 (GPU)      │
+│                      STATE TIER (SUPABASE)                               │
+│  DB Tables: cases, evidence, findings (status, human_feedback)          │
+│  NO storage bucket — raw evidence never persisted here                  │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
+
+**Raw evidence never leaves the AMD processing environment. Files are processed in an isolated temp directory and permanently deleted after analysis. Only the structured findings report is persisted.**
 
 ---
 
@@ -85,45 +97,63 @@ async def analyze_memory_forensics(volatility_output: str):
 
 ---
 
-## 🚀 Running the Platform Locally (For Judges)
+## 🚀 Running the Platform (For Judges)
 
-Because this repository is public, we have omitted our secret keys. To evaluate this project locally, you must provide your own Supabase and Fireworks AI credentials.
+Because this repository is public, secrets are omitted. You need your own Supabase credentials and an AMD Developer Cloud instance (or Fireworks API key as fallback).
 
-### 1. Database & Environment Setup
-1. Clone the repository and install frontend dependencies:
+### 1. Database Setup
+1. Clone the repo and install frontend dependencies:
    ```bash
    npm install
    ```
-2. Rename or copy the example environment file:
+2. Copy the example env file and fill in your keys:
    ```bash
    cp .env.example .env.local
    ```
-3. Open `.env.local` and fill in your keys:
-   - `NEXT_PUBLIC_SUPABASE_URL` & `NEXT_PUBLIC_SUPABASE_ANON_KEY` (From Supabase API settings)
-   - `SUPABASE_SERVICE_KEY` (Needed for the Python worker to bypass RLS)
-   - `FIREWORKS_API_KEY` (Needed for Gemma 3 inference)
-4. Initialize the database by running the four SQL files located in `supabase/migrations/` sequentially in your Supabase SQL Editor.
+   Fill in:
+   - `NEXT_PUBLIC_SUPABASE_URL` & `NEXT_PUBLIC_SUPABASE_ANON_KEY` — from Supabase API settings
+   - `SUPABASE_SERVICE_KEY` — service role key (for the Python backend to bypass RLS)
+   - `NEXT_PUBLIC_AMD_BACKEND_URL` — the public IP:port of your AMD FastAPI instance
+   - `FIREWORKS_API_KEY` — optional; used as Gemma 3 fallback if ROCm GPU is unavailable
+3. In your Supabase SQL Editor, run the migration files **in order**:
+   ```
+   supabase/migrations/01_cleanup.sql
+   supabase/migrations/02_enums.sql
+   supabase/migrations/03_tables.sql
+   supabase/migrations/04_rls.sql
+   supabase/migrations/05_feedback_loop.sql
+   supabase/migrations/06_demo_rls.sql   ← allows anon reads/writes for local testing
+   ```
 
 ### 2. Start the Frontend (Next.js)
-Start the Next.js development server:
 ```bash
 npm run dev
 ```
-The dashboard will be available at `http://localhost:3000`.
+Dashboard available at `http://localhost:3000`.
 
-### 3. Start the Unicorn Engine (Python Worker)
-The stateless Python worker autonomously polls the database, runs Volatility 3, and inferences Gemma 3.
-1. Open a new terminal, navigate to the worker directory, and install dependencies:
-   ```bash
-   cd worker
-   pip install -r requirements.txt
-   ```
-2. Ensure you have Volatility 3 (`vol.py`) accessible in your environment.
-3. Start the worker:
-   ```bash
-   python inzex_engine.py
-   ```
-*Note: The worker uses `python-dotenv` to automatically look up and read your `.env.local` file.*
+### 3. Deploy the Unicorn Engine (AMD FastAPI)
+
+On your AMD Developer Cloud ROCm Jupyter instance:
+
+```bash
+# 1. Clone or upload the worker directory
+git clone https://github.com/YOUR_REPO worker && cd worker
+
+# 2. Install dependencies (ROCm-compatible torch + vLLM must already be installed on the AMD image)
+pip install -r requirements.txt
+
+# 3. Copy your .env.local to the project root (one level above worker/)
+cp /path/to/.env.local ../
+
+# 4. Clone Volatility 3 so vol.py is accessible
+git clone https://github.com/volatilityfoundation/volatility3.git /opt/volatility3
+export PATH="$PATH:/opt/volatility3"
+
+# 5. Start the FastAPI server (runs on 0.0.0.0:8000, publicly reachable)
+python inzex_engine.py
+```
+
+Set `NEXT_PUBLIC_AMD_BACKEND_URL=http://<your-instance-public-ip>:8000` in your `.env.local`.
 
 ## 📦 Required Deliverables
 
