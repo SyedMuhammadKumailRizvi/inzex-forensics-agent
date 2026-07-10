@@ -59,11 +59,7 @@ export function AIFinding({ finding }: AIFindingProps) {
         </div>
       )}
       
-      {finding.confidence_score && (
-        <div className="conf-score" style={{ fontFamily: 'var(--mono)', fontSize: 34, fontWeight: 700, color: 'var(--amber)', margin: '4px 0 2px' }}>
-          {finding.confidence_score}%
-        </div>
-      )}
+
       
       <div className="conf-note" style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 18, padding: '10px 12px', background: 'var(--amber-dim)', border: '1px solid #4A3A15', borderRadius: 6 }}>
         {finding.severity} finding — {finding.ai_rationale?.split('.')[0] + '.' || 'Detected suspicious behavior.'}

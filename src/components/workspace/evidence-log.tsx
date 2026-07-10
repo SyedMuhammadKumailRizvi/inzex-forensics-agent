@@ -20,7 +20,7 @@ export function EvidenceLog({ finding }: EvidenceLogProps) {
       <p className="panel-sub" style={{ fontSize: 13, color: 'var(--text-secondary)', margin: '0 0 16px' }}>Plugin: {finding.plugin_name}</p>
       <div className="evidence-log" style={{ fontFamily: 'var(--mono)', fontSize: 12, lineHeight: 1.9, background: 'var(--bg-page)', border: '1px solid var(--border-soft)', borderRadius: 6, padding: '14px 16px', maxHeight: 480, overflowX: 'auto', overflowY: 'auto', flex: 1 }}>
         <div className="log-line" style={{ color: 'var(--text-tertiary)', whiteSpace: 'pre', padding: '2px 0 2px 10px', borderLeft: '2px solid transparent' }}>
-          {finding.volatility_raw_output || 'No output captured.'}
+          {finding.volatility_raw_json ? JSON.stringify(finding.volatility_raw_json, null, 2) : 'No output captured.'}
         </div>
       </div>
     </div>
