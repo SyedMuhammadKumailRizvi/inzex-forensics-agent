@@ -89,7 +89,7 @@ VOLATILITY_PLUGINS = [
     "windows.cmdline",
 ]
 
-def run_volatility_plugin(file_path: str, plugin: str) -> dict:
+def run_volatility_plugin(file_path: str, filename: str, plugin: str) -> dict:
     """Run one Volatility 3 plugin against file_path. Returns structured dict."""
     try:
         cmd = ["python3", "vol.py", "-f", file_path, plugin, "--json"]
@@ -101,8 +101,8 @@ def run_volatility_plugin(file_path: str, plugin: str) -> dict:
             except json.JSONDecodeError:
                 rows = [{"raw": line} for line in result.stdout.splitlines() if line.strip()]
         
-        # MOCK INJECTION FOR HACKATHON: If empty or fails (like with our dummy .vmem), inject realistic data!
-        if not rows or len(rows) == 0:
+        # MOCK INJECTION FOR HACKATHON: Only if we are testing the dummy file!
+        if (not rows or len(rows) == 0) and filename == "dummy_evidence.vmem":
             if plugin == "windows.netscan":
                 rows = [{"LocalAddr": "192.168.1.105", "LocalPort": 49152, "ForeignAddr": "182.191.83.69", "ForeignPort": 443, "State": "ESTABLISHED", "PID": 4124, "Owner": "svchost.exe"}]
             elif plugin == "windows.malfind":
@@ -120,14 +120,15 @@ def run_volatility_plugin(file_path: str, plugin: str) -> dict:
         print(f"[-] Plugin {plugin} failed: {e}")
         # Inject mock data even on failure
         rows = []
-        if plugin == "windows.netscan":
-            rows = [{"LocalAddr": "192.168.1.105", "LocalPort": 49152, "ForeignAddr": "182.191.83.69", "ForeignPort": 443, "State": "ESTABLISHED", "PID": 4124, "Owner": "svchost.exe"}]
-        elif plugin == "windows.malfind":
-            rows = [{"PID": 4124, "Process": "svchost.exe", "Start": "0x10000000", "End": "0x10004000", "Protection": "PAGE_EXECUTE_READWRITE", "Hexdump": "4D 5A 90 00 03 00 ...MZ."}]
-        elif plugin == "windows.pslist":
-            rows = [{"PID": 4124, "PPID": 600, "ImageFileName": "svchost.exe", "Offset": "0x80000000"}]
-        elif plugin == "windows.cmdline":
-            rows = [{"PID": 4124, "Process": "svchost.exe", "Args": "svchost.exe -k netsvcs -p -s BITS"}]
+        if filename == "dummy_evidence.vmem":
+            if plugin == "windows.netscan":
+                rows = [{"LocalAddr": "192.168.1.105", "LocalPort": 49152, "ForeignAddr": "182.191.83.69", "ForeignPort": 443, "State": "ESTABLISHED", "PID": 4124, "Owner": "svchost.exe"}]
+            elif plugin == "windows.malfind":
+                rows = [{"PID": 4124, "Process": "svchost.exe", "Start": "0x10000000", "End": "0x10004000", "Protection": "PAGE_EXECUTE_READWRITE", "Hexdump": "4D 5A 90 00 03 00 ...MZ."}]
+            elif plugin == "windows.pslist":
+                rows = [{"PID": 4124, "PPID": 600, "ImageFileName": "svchost.exe", "Offset": "0x80000000"}]
+            elif plugin == "windows.cmdline":
+                rows = [{"PID": 4124, "Process": "svchost.exe", "Args": "svchost.exe -k netsvcs -p -s BITS"}]
         return {"plugin": plugin, "rows": rows, "anomalies": [str(e)]}
 
 # ---------------------------------------------------------------------------
@@ -167,6 +168,15 @@ async def analyze_with_ai(volatility_results: list[dict], human_feedback: Option
     full_prompt = f"<|system|>\n{SYSTEM_PROMPT}\n<|user|>\n{user_content}\n<|assistant|>\n"
 
     # --- vLLM path (AMD ROCm) ---
+    import re
+    def clean_json_markdown(text: str) -> str:
+        """Removes markdown code blocks (e.g. ```json ... ```)"""
+        text = text.strip()
+        match = re.search(r"```(?:json)?\s*(.*?)\s*```", text, re.DOTALL)
+        if match:
+            return match.group(1).strip()
+        return text
+
     try:
         from vllm import SamplingParams
         sampling_params = SamplingParams(temperature=0.1, max_tokens=4096)
@@ -174,7 +184,7 @@ async def analyze_with_ai(volatility_results: list[dict], human_feedback: Option
         output_text = ""
         async for request_output in llm_engine.generate(full_prompt, sampling_params, request_id=request_id):
             output_text = request_output.outputs[0].text
-        return json.loads(output_text)
+        return json.loads(clean_json_markdown(output_text))
     except Exception as e:
         print(f"[-] vLLM inference failed ({e}). Trying fallback.")
 
@@ -189,7 +199,8 @@ async def analyze_with_ai(volatility_results: list[dict], human_feedback: Option
                 ],
                 max_tokens=4096,
             )
-            return json.loads(response.choices[0].message.content)
+            raw_content = response.choices[0].message.content
+            return json.loads(clean_json_markdown(raw_content))
         except Exception as e2:
             print(f"[-] Fireworks fallback also failed: {e2}")
 
@@ -275,7 +286,7 @@ async def run_pipeline_background(case_id: str, file_infos: list[dict]):
             try:
                 for plugin in VOLATILITY_PLUGINS:
                     print(f"[*] Running {plugin} on {filename}...")
-                    result = run_volatility_plugin(tmp_path, plugin)
+                    result = run_volatility_plugin(tmp_path, filename, plugin)
                     result["source_file"] = filename
                     plugin_results.append(result)
                     

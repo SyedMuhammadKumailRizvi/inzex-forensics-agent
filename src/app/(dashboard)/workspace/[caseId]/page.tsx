@@ -123,16 +123,16 @@ export default function Workspace({ params }: { params: Promise<{ caseId: string
     <div className="app print-friendly">
       <style dangerouslySetInnerHTML={{__html: `
         @media print {
-          body { background: white !important; color: black !important; }
-          .app { padding: 0 !important; max-width: 100% !important; }
-          .footer-bar, .mode-toggle, textarea, button, .navbar { display: none !important; }
-          .workspace { display: block !important; }
-          .panel { background: white !important; border: 1px solid #ccc !important; margin-bottom: 20px; page-break-inside: avoid; }
-          * { color: black !important; }
-          .case-id span { color: #d00 !important; }
+          @page { margin: 20mm; size: auto; }
+          body { background: white !important; color: #111 !important; font-family: sans-serif; }
+          .app { padding: 0 !important; max-width: 100% !important; background: white !important; }
+          .hide-on-print { display: none !important; }
+          .print-only { display: block !important; }
+          * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
         }
+        .print-only { display: none; }
       `}} />
-      <div className="case-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', borderBottom: '1px solid var(--border)', paddingBottom: 20, marginBottom: 28 }}>
+      <div className="case-header hide-on-print" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', borderBottom: '1px solid var(--border)', paddingBottom: 20, marginBottom: 28 }}>
         <div>
           <div className="case-label" style={{ fontFamily: 'var(--mono)', fontSize: 11, letterSpacing: 2, color: 'var(--text-tertiary)', textTransform: 'uppercase', marginBottom: 8 }}>
             Inzex Forensics — {caseData.lead_investigator || 'Unknown Analyst'}
@@ -158,7 +158,7 @@ export default function Workspace({ params }: { params: Promise<{ caseId: string
         </div>
       </div>
 
-      <div className="top-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
+      <div className="top-row hide-on-print" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
         <div style={{ flex: 1 }}></div>
         <div className="mode-toggle" style={{ display: 'flex', border: '1px solid var(--border)', borderRadius: 7, overflow: 'hidden' }}>
           <button 
@@ -178,49 +178,94 @@ export default function Workspace({ params }: { params: Promise<{ caseId: string
         </div>
       </div>
 
-      {activeTab === 'ai-review' ? (
-        <div className="workspace" id="workspace" style={{ position: 'relative', display: 'grid', gridTemplateColumns: '280px 1fr 340px', gap: 20 }}>
-          <svg id="thread-svg" style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none', overflow: 'visible' }}>
-            <path id="thread-path" d="" style={{ fill: 'none', stroke: 'var(--red)', strokeWidth: 1.5, strokeDasharray: '6 4', opacity: 0.85 }} />
-          </svg>
+      <div className="hide-on-print">
+        {activeTab === 'ai-review' ? (
+          <div className="workspace" id="workspace" style={{ position: 'relative', display: 'grid', gridTemplateColumns: '280px 1fr 340px', gap: 20 }}>
+            <svg id="thread-svg" style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none', overflow: 'visible' }}>
+              <path id="thread-path" d="" style={{ fill: 'none', stroke: 'var(--red)', strokeWidth: 1.5, strokeDasharray: '6 4', opacity: 0.85 }} />
+            </svg>
 
-        <div className="panel" style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 10, padding: 18, display: 'flex', flexDirection: 'column' }}>
-          <p className="panel-title" style={{ fontSize: 11, letterSpacing: 1.5, textTransform: 'uppercase', color: 'var(--text-tertiary)', margin: '0 0 3px' }}>Forensic Analysis Stages</p>
-          <p className="panel-sub" style={{ fontSize: 13, color: 'var(--text-secondary)', margin: '0 0 16px' }}>Volatility 3 Plugins executed</p>
+          <div className="panel" style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 10, padding: 18, display: 'flex', flexDirection: 'column' }}>
+            <p className="panel-title" style={{ fontSize: 11, letterSpacing: 1.5, textTransform: 'uppercase', color: 'var(--text-tertiary)', margin: '0 0 3px' }}>Forensic Analysis Stages</p>
+            <p className="panel-sub" style={{ fontSize: 13, color: 'var(--text-secondary)', margin: '0 0 16px' }}>Volatility 3 Plugins executed</p>
 
-          {findings.length === 0 ? (
-            <p style={{ color: 'var(--text-tertiary)', fontSize: 13, padding: 12 }}>Waiting for Unicorn Engine analysis to complete...</p>
-          ) : (
-            findings.map((f, i) => (
-              <div 
-                key={f.id}
-                className={`stage-card ${selectedFinding?.id === f.id ? 'selected' : ''}`}
-                onClick={() => setSelectedFinding(f)}
-                style={{ border: `1px solid ${selectedFinding?.id === f.id ? 'var(--red)' : 'var(--border)'}`, borderRadius: 8, padding: '12px 14px', marginBottom: 10, cursor: 'pointer', transition: 'border-color .15s', background: selectedFinding?.id === f.id ? 'var(--red-dim)' : 'var(--bg-raised)' }}
-              >
-                <div className="stage-top" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                  <span className="stage-num" style={{ fontFamily: 'var(--mono)', fontSize: 11, color: selectedFinding?.id === f.id ? '#C58AFF' : 'var(--text-tertiary)' }}>{f.plugin_name}</span>
+            {findings.length === 0 ? (
+              <p style={{ color: 'var(--text-tertiary)', fontSize: 13, padding: 12 }}>Waiting for Unicorn Engine analysis to complete...</p>
+            ) : (
+              findings.map((f, i) => (
+                <div 
+                  key={f.id}
+                  className={`stage-card ${selectedFinding?.id === f.id ? 'selected' : ''}`}
+                  onClick={() => setSelectedFinding(f)}
+                  style={{ border: `1px solid ${selectedFinding?.id === f.id ? 'var(--red)' : 'var(--border)'}`, borderRadius: 8, padding: '12px 14px', marginBottom: 10, cursor: 'pointer', transition: 'border-color .15s', background: selectedFinding?.id === f.id ? 'var(--red-dim)' : 'var(--bg-raised)' }}
+                >
+                  <div className="stage-top" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                    <span className="stage-num" style={{ fontFamily: 'var(--mono)', fontSize: 11, color: selectedFinding?.id === f.id ? '#C58AFF' : 'var(--text-tertiary)' }}>{f.plugin_name}</span>
+                  </div>
+                  <p className="stage-name" style={{ fontSize: 14, fontWeight: 500, margin: '0 0 4px' }}>{f.mitre_technique || 'Analysis'}</p>
+                  <div className="stage-conf-row" style={{ display: 'flex', alignItems: 'center', fontSize: 11, color: 'var(--text-tertiary)', marginTop: 8 }}>
+                    <span className={`confidence-dot ${f.severity === 'Critical' ? 'dot-high' : 'dot-medium'}`} style={{ width: 8, height: 8, borderRadius: '50%', display: 'inline-block', marginRight: 6, background: f.severity === 'Critical' ? 'var(--red)' : 'var(--amber)' }}></span>
+                    {f.severity} severity
+                  </div>
                 </div>
-                <p className="stage-name" style={{ fontSize: 14, fontWeight: 500, margin: '0 0 4px' }}>{f.mitre_technique || 'Analysis'}</p>
-                <div className="stage-conf-row" style={{ display: 'flex', alignItems: 'center', fontSize: 11, color: 'var(--text-tertiary)', marginTop: 8 }}>
-                  <span className={`confidence-dot ${f.severity === 'Critical' ? 'dot-high' : 'dot-medium'}`} style={{ width: 8, height: 8, borderRadius: '50%', display: 'inline-block', marginRight: 6, background: f.severity === 'Critical' ? 'var(--red)' : 'var(--amber)' }}></span>
-                  {f.severity} severity
-                </div>
-              </div>
-            ))
-          )}
-        </div>
+              ))
+            )}
+          </div>
 
-        <EvidenceLog finding={selectedFinding} />
-        <AIFinding finding={selectedFinding} onUpdate={fetchData} />
+          <EvidenceLog finding={selectedFinding} />
+          <AIFinding finding={selectedFinding} onUpdate={fetchData} />
 
-        </div>
-      ) : (
-        <ManualBrowser findings={findings} />
-      )}
+          </div>
+        ) : (
+          <ManualBrowser findings={findings} />
+        )}
+      </div>
 
-      <div className="footer-bar" style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 24 }}>
+      <div className="footer-bar hide-on-print" style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 24 }}>
         <button className="btn-primary" onClick={handlePrint}>Export PDF Report</button>
+      </div>
+
+      {/* --- PRINT ONLY REPORT --- */}
+      <div className="print-only" style={{ color: 'black' }}>
+        <div style={{ textAlign: 'center', borderBottom: '2px solid #000', paddingBottom: '20px', marginBottom: '30px' }}>
+          <h1 style={{ fontSize: '24px', fontWeight: 'bold', margin: '0 0 10px 0', textTransform: 'uppercase' }}>Inzex Forensics Incident Report</h1>
+          <p style={{ fontSize: '14px', margin: 0, color: '#444' }}>Case Designation: <strong>{caseData.case_designation}</strong></p>
+          <p style={{ fontSize: '14px', margin: '5px 0 0 0', color: '#444' }}>Lead Investigator: {caseData.lead_investigator || 'Unknown Analyst'}</p>
+          <p style={{ fontSize: '14px', margin: '5px 0 0 0', color: '#444' }}>Generated: {new Date().toLocaleString()}</p>
+        </div>
+
+        <h2 style={{ fontSize: '18px', borderBottom: '1px solid #ddd', paddingBottom: '10px', marginBottom: '15px' }}>Executive Summary</h2>
+        <p style={{ fontSize: '14px', lineHeight: '1.6', marginBottom: '30px' }}>
+          This report details the automated memory forensics analysis conducted on <strong>{evidence?.file_name}</strong>. 
+          A total of <strong>{findings.length}</strong> findings were identified by the AI inference engine.
+        </p>
+
+        <h2 style={{ fontSize: '18px', borderBottom: '1px solid #ddd', paddingBottom: '10px', marginBottom: '20px' }}>Detailed Findings</h2>
+        {findings.map((f) => (
+          <div key={f.id} style={{ border: '1px solid #ccc', borderRadius: '8px', padding: '15px', marginBottom: '20px', pageBreakInside: 'avoid' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #eee', paddingBottom: '10px', marginBottom: '10px' }}>
+              <span style={{ fontWeight: 'bold', fontSize: '15px' }}>{f.mitre_technique || 'Analysis Finding'}</span>
+              <span style={{ fontWeight: 'bold', color: f.severity === 'Critical' ? '#d32f2f' : '#f57c00' }}>{f.severity} Severity</span>
+            </div>
+            <p style={{ fontSize: '12px', color: '#666', margin: '0 0 10px 0', fontFamily: 'monospace' }}>Plugin: {f.plugin_name}</p>
+            <div style={{ fontSize: '14px', lineHeight: '1.5' }}>
+              <strong>AI Rationale:</strong>
+              <p style={{ marginTop: '5px' }}>{f.ai_rationale}</p>
+            </div>
+            {f.human_feedback && (
+              <div style={{ fontSize: '13px', lineHeight: '1.5', marginTop: '15px', padding: '10px', background: '#f5f5f5', borderLeft: '3px solid #666' }}>
+                <strong>Analyst Feedback:</strong> {f.human_feedback}
+              </div>
+            )}
+            <div style={{ fontSize: '13px', lineHeight: '1.5', marginTop: '15px', padding: '10px', background: '#f5f5f5', borderLeft: '3px solid #1976d2' }}>
+                <strong>Status:</strong> {f.status.toUpperCase()}
+            </div>
+          </div>
+        ))}
+
+        <div style={{ marginTop: '50px', textAlign: 'center', fontSize: '12px', color: '#888' }}>
+          <p>Generated securely via Inzex Forensics Unicorn Engine.</p>
+        </div>
       </div>
 
     </div>

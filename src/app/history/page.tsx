@@ -12,7 +12,7 @@ export default async function HistoryPage() {
     const { data } = await supabase
       .from("cases")
       .select("*")
-      .eq("user_id", user.id)
+      .eq("lead_investigator", user.id)
       .order("created_at", { ascending: false });
     cases = data || [];
   }
@@ -73,10 +73,12 @@ export default async function HistoryPage() {
               {cases.map((c) => (
                 <div key={c.id} className="p-4 rounded-xl border border-[#202026] bg-white/5 hover:border-[#9D00FF]/50 transition-colors flex justify-between items-center">
                   <div>
-                    <h3 className="text-lg font-medium text-white">{c.case_name}</h3>
-                    <p className="text-sm text-zinc-400">Ref: {c.reference_id} • OS: {c.os_profile}</p>
+                    <h3 className="text-lg font-medium text-white">{c.case_designation}</h3>
+                    <p className="text-sm text-zinc-400">Ref: {c.reference_id} • OS: {c.os_hint}</p>
                   </div>
-                  <Button variant="outline" size="sm">View Report</Button>
+                  <Link href={`/workspace/${c.id}`}>
+                    <Button variant="outline" size="sm">View Report</Button>
+                  </Link>
                 </div>
               ))}
             </div>
