@@ -31,13 +31,14 @@ export default function Workspace({ params }: { params: Promise<{ caseId: string
         
       if (caseRow) setCaseData(caseRow as Case);
 
-      const { data: evidenceRow } = await supabase
+      const { data: evidenceRows } = await supabase
         .from('evidence')
         .select('*')
-        .eq('case_id', caseId)
-        .single();
+        .eq('case_id', caseId);
         
-      if (evidenceRow) setEvidence(evidenceRow as Evidence);
+      if (evidenceRows && evidenceRows.length > 0) {
+        setEvidence(evidenceRows[0] as Evidence);
+      }
 
       // Fetch Findings
       const { data: findingsRows } = await supabase
@@ -119,10 +120,10 @@ export default function Workspace({ params }: { params: Promise<{ caseId: string
       <div className="case-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', borderBottom: '1px solid var(--border)', paddingBottom: 20, marginBottom: 28 }}>
         <div>
           <div className="case-label" style={{ fontFamily: 'var(--mono)', fontSize: 11, letterSpacing: 2, color: 'var(--text-tertiary)', textTransform: 'uppercase', marginBottom: 8 }}>
-            {caseData.organization || 'Inzex Forensics'} — {caseData.investigator_name}
+            Inzex Forensics — {caseData.lead_investigator || 'Unknown Analyst'}
           </div>
           <div className="case-id" style={{ fontFamily: 'var(--mono)', fontSize: 30, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: 1 }}>
-            CASE // <span style={{ color: 'var(--red)' }}>{caseData.case_number}</span>
+            CASE: <span style={{ color: 'var(--red)' }}>{caseData.case_designation}</span>
           </div>
         </div>
         <div className="case-meta" style={{ display: 'flex', gap: 22, alignItems: 'center' }}>

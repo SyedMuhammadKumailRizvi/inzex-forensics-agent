@@ -15,7 +15,7 @@ This project was specifically engineered to meet the requirements of **Track 3 (
 ### Meeting the AMD Compute Mandate
 To satisfy the automated pre-screening criteria, our architecture strictly relies on the **AMD Developer Cloud (ROCm 7.2 + vLLM 0.16.0 + PyTorch 2.9)** for heavy computation.
 
-The Next.js frontend and Supabase database act as permanent, persistent cloud infrastructure. The AMD ROCm instance runs a **synchronous FastAPI server** that accepts memory dump uploads, runs Volatility 3, inferences Gemma 3, and writes only the structured findings back to Supabase — raw evidence never leaves the AMD environment.
+The Next.js frontend and Supabase database act as permanent, persistent cloud infrastructure. The AMD ROCm instance runs a **synchronous FastAPI server** that accepts memory dump uploads, runs Volatility 3, inferences Gemma 4, and writes only the structured findings back to Supabase — raw evidence never leaves the AMD environment.
 
 *(Note: In accordance with Track 3 rules, no Docker container is used for the backend deployment).*
 
@@ -44,7 +44,7 @@ Our architecture bridges large memory dump handling, AMD accelerated computation
 │  [1] Save .vmem  →  temp dir (isolated, never uploaded to any cloud)    │
 │  [2] Volatility 3 (CPU): pslist → netscan → malfind → cmdline           │
 │  [3] os.unlink() — temp file deleted IMMEDIATELY after plugins finish   │
-│  [4] Gemma 3 8B (ROCm GPU via vLLM): structured JSON threat report      │
+│  [4] Gemma 4 8B (ROCm GPU via vLLM): structured JSON threat report      │
 │  [5] Write findings JSON to Supabase cases/findings tables              │
 │  [6] Return { case_id } to frontend → redirect to workspace             │
 │                                                                         │
@@ -64,22 +64,22 @@ Our architecture bridges large memory dump handling, AMD accelerated computation
 
 ---
 
-## 🧠 Gemma 3 on ROCm (The Inference Engine)
+## 🧠 Gemma 4 on ROCm (The Inference Engine)
 
-To fulfill the requirements for the Gemma Bounty, **Gemma 3 is hosted locally on the AMD hardware**, rather than relying on a cloud API. 
+To fulfill the requirements for the Gemma Bounty, **Gemma 4 is hosted locally on the AMD hardware**, rather than relying on a cloud API. 
 
-The Python worker node extracts malicious artifacts from raw memory dumps using Volatility 3 (CPU bounded), and then pipes the raw hex/terminal output directly into the locally hosted Gemma 3 model (GPU bounded). The AI agent evaluates the evidence and outputs a highly confident, structured JSON report mapped to the MITRE ATT&CK framework.
+The Python worker node extracts malicious artifacts from raw memory dumps using Volatility 3 (CPU bounded), and then pipes the raw hex/terminal output directly into the locally hosted Gemma 4 model (GPU bounded). The AI agent evaluates the evidence and outputs a highly confident, structured JSON report mapped to the MITRE ATT&CK framework.
 
 ### AMD Compute Evidence (vLLM on ROCm)
-Below is the core snippet demonstrating how the backend initializes Gemma 3 natively on the AMD hardware using the ROCm-optimized vLLM server:
+Below is the core snippet demonstrating how the backend initializes Gemma 4 natively on the AMD hardware using the ROCm-optimized vLLM server:
 
 ```python
 import asyncio
 from vllm import AsyncLLMEngine, AsyncEngineArgs
 
-# Initialize Gemma 3 natively on AMD ROCm hardware
+# Initialize Gemma 4 natively on AMD ROCm hardware
 engine_args = AsyncEngineArgs(
-    model="google/gemma-3-8b-it",
+    model="google/gemma-4-12B-it",
     tensor_parallel_size=1, # Adjust based on available AMD GPUs
     gpu_memory_utilization=0.90,
     enforce_eager=True # Required for specific ROCm configurations
@@ -90,7 +90,7 @@ llm_engine = AsyncLLMEngine.from_engine_args(engine_args)
 
 async def analyze_memory_forensics(volatility_output: str):
     prompt = f"Analyze this Volatility 3 hex dump and map to MITRE ATT&CK:\n{volatility_output}"
-    # Generate forensic report via local Gemma 3
+    # Generate forensic report via local Gemma 4
     results = await llm_engine.generate(prompt)
     return results
 ```
@@ -114,7 +114,7 @@ Because this repository is public, secrets are omitted. You need your own Supaba
    - `NEXT_PUBLIC_SUPABASE_URL` & `NEXT_PUBLIC_SUPABASE_ANON_KEY` — from Supabase API settings
    - `SUPABASE_SERVICE_KEY` — service role key (for the Python backend to bypass RLS)
    - `NEXT_PUBLIC_AMD_BACKEND_URL` — the public IP:port of your AMD FastAPI instance
-   - `FIREWORKS_API_KEY` — optional; used as Gemma 3 fallback if ROCm GPU is unavailable
+   - `FIREWORKS_API_KEY` — optional; used as Gemma 4 fallback if ROCm GPU is unavailable
 3. In your Supabase SQL Editor, run the migration files **in order**:
    ```
    supabase/migrations/01_cleanup.sql

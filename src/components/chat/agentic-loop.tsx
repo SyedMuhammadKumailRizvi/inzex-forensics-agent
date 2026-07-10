@@ -4,7 +4,7 @@ export function AgenticLoop() {
   return (
     <div className="agentic-loop">
       <textarea 
-        placeholder="Dispute finding or add context for Gemma 3 to re-evaluate..." 
+        placeholder="Dispute finding or add context for Gemma 4 to re-evaluate..." 
         style={{ 
           width: '100%', 
           background: 'var(--bg-page)', 

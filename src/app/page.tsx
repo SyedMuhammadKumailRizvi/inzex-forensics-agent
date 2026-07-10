@@ -102,7 +102,7 @@ export default function LandingPage() {
               <div className="h-12 w-12 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center mb-6 shadow-sm group-hover:scale-110 transition-transform">
                 <Activity className="h-6 w-6 text-zinc-100" />
               </div>
-              <h3 className="text-xl font-semibold mb-3 text-white">Gemma 3 Intelligence</h3>
+              <h3 className="text-xl font-semibold mb-3 text-white">Gemma 4 Intelligence</h3>
               <p className="text-sm text-zinc-400 leading-relaxed">Automated IOC extraction and structured JSON threat reporting using state-of-the-art local LLMs on AMD hardware.</p>
             </div>
           </div>
@@ -210,7 +210,7 @@ export default function LandingPage() {
                   <h3 className="font-bold text-white uppercase tracking-wider">The Unicorn Engine</h3>
                 </div>
                 <p className="text-[#9D00FF]/80 text-xs font-semibold mb-1">AMD DEVELOPER CLOUD (ROCm NOTEBOOK)</p>
-                <p className="text-zinc-500 text-xs">Python FastAPI app runs Volatility 3 (CPU) & Google Gemma 3 (GPU)</p>
+                <p className="text-zinc-500 text-xs">Python FastAPI app runs Volatility 3 (CPU) & Google Gemma 4 (GPU)</p>
               </div>
             </div>
 

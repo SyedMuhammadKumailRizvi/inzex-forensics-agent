@@ -20,7 +20,7 @@ const STAGE_LABELS: Record<UploadStage, string> = {
   idle: '',
   uploading:  'Uploading evidence to AMD processing environment...',
   volatility: 'Unicorn Engine: Running Volatility 3 plugins (pslist, netscan, malfind, cmdline)...',
-  gemma:      'Gemma 3 on ROCm: Generating structured threat report...',
+  gemma:      'Gemma 4 on ROCm: Generating structured threat report...',
   complete:   'Analysis complete. Loading your workspace...',
   error:      'An error occurred. See console for details.',
 };
@@ -84,33 +84,48 @@ export default function CaseIntakePage() {
       const resp = await fetch(`${amdBackendUrl}/analyze`, {
         method: "POST",
         body: formData,
-        // Don't set Content-Type header — browser sets it with boundary
       });
-
-      setStage('volatility');
-      setProgress(55);
 
       if (!resp.ok) {
         const detail = await resp.text();
         throw new Error(`Backend returned ${resp.status}: ${detail}`);
       }
 
-      setStage('gemma');
-      setProgress(80);
+      const data = await resp.json() as { case_id: string; status: string };
+      const caseId = data.case_id;
 
-      const data = await resp.json() as {
-        case_id: string;
-        status: string;
-        findings_count: number;
-        threat_narrative: string;
-      };
-
-      setStage('complete');
-      setProgress(100);
-
-      // Short pause so the user can see "complete" before redirect
-      await new Promise(r => setTimeout(r, 1200));
-      router.push(`/workspace/${data.case_id}`);
+      // Poll status
+      const pollInterval = setInterval(async () => {
+        try {
+          const statusResp = await fetch(`${amdBackendUrl}/status/${caseId}`);
+          if (statusResp.ok) {
+            const statusData = await statusResp.json();
+            
+            if (statusData.status === 'uploading') {
+              setStage('uploading');
+              setProgress(15);
+            } else if (statusData.status === 'volatility') {
+              setStage('volatility');
+              setProgress(45);
+            } else if (statusData.status === 'gemma') {
+              setStage('gemma');
+              setProgress(80);
+            } else if (statusData.status === 'completed') {
+              clearInterval(pollInterval);
+              setStage('complete');
+              setProgress(100);
+              await new Promise(r => setTimeout(r, 1200));
+              router.push(`/workspace/${caseId}`);
+            } else if (statusData.status === 'error') {
+              clearInterval(pollInterval);
+              setStage('error');
+              setErrorMsg("Backend processing failed.");
+            }
+          }
+        } catch (pollErr) {
+          console.error("Polling error:", pollErr);
+        }
+      }, 2000);
 
     } catch (err: any) {
       console.error("Analysis failed:", err);
@@ -140,122 +155,126 @@ export default function CaseIntakePage() {
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_350px] gap-8">
         {/* Main Intake Form */}
         <div className="space-y-6">
-          {/* Section 1: Investigation Parameters */}
-          <div className="bg-[#0a0a0c] border border-white/5 rounded-2xl shadow-sm relative z-20">
-            <div className="px-6 py-5 border-b border-white/5 bg-white/[0.02] rounded-t-2xl">
-              <h2 className="text-base font-semibold text-white">Investigation Parameters</h2>
-              <p className="text-sm text-zinc-500 mt-1">Define case nomenclature and lead assignment before memory processing.</p>
-            </div>
-            <div className="p-6 space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-[11px] font-semibold text-zinc-500 mb-2 uppercase tracking-widest">Case Designation</label>
-                  <Input value={caseDesignation} onChange={(e) => setCaseDesignation(e.target.value)} type="text" placeholder="e.g. OP-MIDNIGHT-SUN" className="bg-[#121215] border-white/5 shadow-inner" />
+          {(!isProcessing && stage !== 'complete') && (
+            <>
+              {/* Section 1: Investigation Parameters */}
+              <div className="bg-[#0a0a0c] border border-white/5 rounded-2xl shadow-sm relative z-20">
+                <div className="px-6 py-5 border-b border-white/5 bg-white/[0.02] rounded-t-2xl">
+                  <h2 className="text-base font-semibold text-white">Investigation Parameters</h2>
+                  <p className="text-sm text-zinc-500 mt-1">Define case nomenclature and lead assignment before memory processing.</p>
                 </div>
-                <div>
-                  <label className="block text-[11px] font-semibold text-zinc-500 mb-2 uppercase tracking-widest">Reference ID</label>
-                  <Input value={referenceId} onChange={(e) => setReferenceId(e.target.value)} type="text" placeholder="e.g. INC-2026-0881" className="bg-[#121215] border-white/5 shadow-inner" />
+                <div className="p-6 space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <label className="block text-[11px] font-semibold text-zinc-500 mb-2 uppercase tracking-widest">Case Designation</label>
+                      <Input value={caseDesignation} onChange={(e) => setCaseDesignation(e.target.value)} type="text" placeholder="e.g. OP-MIDNIGHT-SUN" className="bg-[#121215] border-white/5 shadow-inner" />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-semibold text-zinc-500 mb-2 uppercase tracking-widest">Reference ID</label>
+                      <Input value={referenceId} onChange={(e) => setReferenceId(e.target.value)} type="text" placeholder="e.g. INC-2026-0881" className="bg-[#121215] border-white/5 shadow-inner" />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-semibold text-zinc-500 mb-2 uppercase tracking-widest">Lead Investigator</label>
+                    <Input value={leadInvestigator} onChange={(e) => setLeadInvestigator(e.target.value)} type="text" placeholder="Analyst ID or Full Name" className="bg-[#121215] border-white/5 shadow-inner" />
+                  </div>
                 </div>
               </div>
-              <div>
-                <label className="block text-[11px] font-semibold text-zinc-500 mb-2 uppercase tracking-widest">Lead Investigator</label>
-                <Input value={leadInvestigator} onChange={(e) => setLeadInvestigator(e.target.value)} type="text" placeholder="Analyst ID or Full Name" className="bg-[#121215] border-white/5 shadow-inner" />
-              </div>
-            </div>
-          </div>
 
-          {/* Section 2: Evidence Source */}
-          <div className="bg-[#0a0a0c] border border-white/5 rounded-2xl shadow-sm relative z-30">
-            <div className="px-6 py-5 border-b border-white/5 bg-white/[0.02] rounded-t-2xl">
-              <h2 className="text-base font-semibold text-white">Evidence Payload</h2>
-              <p className="text-sm text-zinc-500 mt-1">
-                Upload the raw memory dump directly to the AMD processing environment.{' '}
-                <span className="text-[#9D00FF]/80">Raw evidence never touches Supabase storage.</span>
-              </p>
-            </div>
-            <div className="p-6">
-              <div
-                className="upload-zone group cursor-pointer"
-                onClick={() => fileInputRef.current?.click()}
-              >
-                <div className="upload-icon">
-                  {selectedFiles.length > 0
-                    ? <CheckCircle className="h-6 w-6 text-[#9D00FF]" />
-                    : <UploadCloud className="h-6 w-6 text-zinc-400 group-hover:text-white transition-colors" />
-                  }
+              {/* Section 2: Evidence Source */}
+              <div className="bg-[#0a0a0c] border border-white/5 rounded-2xl shadow-sm relative z-30">
+                <div className="px-6 py-5 border-b border-white/5 bg-white/[0.02] rounded-t-2xl">
+                  <h2 className="text-base font-semibold text-white">Evidence Payload</h2>
+                  <p className="text-sm text-zinc-500 mt-1">
+                    Upload the raw memory dump directly to the AMD processing environment.{' '}
+                    <span className="text-[#9D00FF]/80">Raw evidence never touches Supabase storage.</span>
+                  </p>
                 </div>
-                {selectedFiles.length > 0 ? (
-                  <div className="w-full mt-4 space-y-2" onClick={(e) => e.stopPropagation()}>
-                    {selectedFiles.map((f, i) => (
-                      <div key={i} className="flex items-center justify-between bg-white/[0.02] p-3 rounded-xl border border-white/10 group/file hover:bg-white/[0.04] transition-colors">
-                        <div className="flex items-center gap-3 overflow-hidden">
-                          <HardDrive className="h-4 w-4 text-[#D6A6FF] shrink-0" />
-                          <span className="text-sm font-medium text-zinc-200 truncate">{f.name}</span>
-                          <span className="text-xs text-zinc-500 shrink-0">({(f.size / 1e6).toFixed(1)} MB)</span>
-                        </div>
-                        <button onClick={(e) => removeFile(i, e)} className="text-zinc-500 hover:text-red-400 p-1.5 rounded-md hover:bg-red-400/10 transition-colors opacity-0 group-hover/file:opacity-100">
-                          <Minus className="h-4 w-4" />
+                <div className="p-6">
+                  <div
+                    className="upload-zone group cursor-pointer"
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    <div className="upload-icon">
+                      {selectedFiles.length > 0
+                        ? <CheckCircle className="h-6 w-6 text-[#9D00FF]" />
+                        : <UploadCloud className="h-6 w-6 text-zinc-400 group-hover:text-white transition-colors" />
+                      }
+                    </div>
+                    {selectedFiles.length > 0 ? (
+                      <div className="w-full mt-4 space-y-2" onClick={(e) => e.stopPropagation()}>
+                        {selectedFiles.map((f, i) => (
+                          <div key={i} className="flex items-center justify-between bg-white/[0.02] p-3 rounded-xl border border-white/10 group/file hover:bg-white/[0.04] transition-colors">
+                            <div className="flex items-center gap-3 overflow-hidden">
+                              <HardDrive className="h-4 w-4 text-[#D6A6FF] shrink-0" />
+                              <span className="text-sm font-medium text-zinc-200 truncate">{f.name}</span>
+                              <span className="text-xs text-zinc-500 shrink-0">({(f.size / 1e6).toFixed(1)} MB)</span>
+                            </div>
+                            <button onClick={(e) => removeFile(i, e)} className="text-zinc-500 hover:text-red-400 p-1.5 rounded-md hover:bg-red-400/10 transition-colors opacity-0 group-hover/file:opacity-100">
+                              <Minus className="h-4 w-4" />
+                            </button>
+                          </div>
+                        ))}
+                        <button className="flex items-center justify-center gap-2 w-full mt-4 py-2.5 text-xs font-medium text-[#D6A6FF] hover:text-white bg-[#9D00FF]/5 hover:bg-[#9D00FF]/15 rounded-xl transition-colors border border-[#9D00FF]/20" onClick={() => fileInputRef.current?.click()}>
+                          <Plus className="h-3 w-3" /> Add additional payload
                         </button>
                       </div>
-                    ))}
-                    <button className="flex items-center justify-center gap-2 w-full mt-4 py-2.5 text-xs font-medium text-[#D6A6FF] hover:text-white bg-[#9D00FF]/5 hover:bg-[#9D00FF]/15 rounded-xl transition-colors border border-[#9D00FF]/20" onClick={() => fileInputRef.current?.click()}>
-                      <Plus className="h-3 w-3" /> Add additional payload
-                    </button>
+                    ) : (
+                      <>
+                        <div className="text-sm font-medium mb-1 text-zinc-300">Click to upload or drag and drop</div>
+                        <div className="text-xs text-zinc-500">Supports .raw, .mem, .img, .vmem (Recommended size: &lt; 4GB)</div>
+                      </>
+                    )}
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      multiple
+                      accept=".vmem,.mem,.raw,.img"
+                      className="hidden"
+                      onChange={handleFileChange}
+                    />
                   </div>
-                ) : (
-                  <>
-                    <div className="text-sm font-medium mb-1 text-zinc-300">Click to upload or drag and drop</div>
-                    <div className="text-xs text-zinc-500">Supports .raw, .mem, .img, .vmem (Recommended size: &lt; 4GB)</div>
-                  </>
-                )}
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  multiple
-                  accept=".vmem,.mem,.raw,.img"
-                  className="hidden"
-                  onChange={handleFileChange}
-                />
+                </div>
               </div>
-            </div>
-          </div>
 
-          {/* Section 3: Analysis Config */}
-          <div className="bg-[#0a0a0c] border border-white/5 rounded-2xl shadow-sm relative z-40">
-            <div className="px-6 py-5 border-b border-white/5 bg-white/[0.02] rounded-t-2xl">
-              <h2 className="text-base font-semibold text-white">Execution Environment</h2>
-              <p className="text-sm text-zinc-500 mt-1">Configure profile targeting and AI depth.</p>
-            </div>
-            <div className="p-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="relative z-50">
-                  <label className="block text-[11px] font-semibold text-zinc-500 mb-2 uppercase tracking-widest">Symbol Operating System Hint</label>
-                  <CustomSelect
-                    value={osProfile}
-                    onChange={setOsProfile}
-                    options={[
-                      { label: "Automatic Detection (Recommended)", value: "auto" },
-                      { label: "Windows (x86/x64)", value: "windows" },
-                      { label: "Linux (x64)", value: "linux" },
-                      { label: "macOS (x64)", value: "macos" }
-                    ]}
-                  />
+              {/* Section 3: Analysis Config */}
+              <div className="bg-[#0a0a0c] border border-white/5 rounded-2xl shadow-sm relative z-40">
+                <div className="px-6 py-5 border-b border-white/5 bg-white/[0.02] rounded-t-2xl">
+                  <h2 className="text-base font-semibold text-white">Execution Environment</h2>
+                  <p className="text-sm text-zinc-500 mt-1">Configure profile targeting and AI depth.</p>
                 </div>
-                <div className="relative z-50">
-                  <label className="block text-[11px] font-semibold text-zinc-500 mb-2 uppercase tracking-widest">Analysis Depth</label>
-                  <CustomSelect
-                    value={analysisDepth}
-                    onChange={setAnalysisDepth}
-                    options={[
-                      { label: "Quick Scan (pslist, pstree)", value: "quick" },
-                      { label: "Standard Scan (+netscan, cmdline)", value: "standard" },
-                      { label: "Deep Forensic Scan (+malfind, vadinfo)", value: "deep" },
-                    ]}
-                  />
+                <div className="p-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="relative z-50">
+                      <label className="block text-[11px] font-semibold text-zinc-500 mb-2 uppercase tracking-widest">Symbol Operating System Hint</label>
+                      <CustomSelect
+                        value={osProfile}
+                        onChange={setOsProfile}
+                        options={[
+                          { label: "Automatic Detection (Recommended)", value: "auto" },
+                          { label: "Windows (x86/x64)", value: "windows" },
+                          { label: "Linux (x64)", value: "linux" },
+                          { label: "macOS (x64)", value: "macos" }
+                        ]}
+                      />
+                    </div>
+                    <div className="relative z-50">
+                      <label className="block text-[11px] font-semibold text-zinc-500 mb-2 uppercase tracking-widest">Analysis Depth</label>
+                      <CustomSelect
+                        value={analysisDepth}
+                        onChange={setAnalysisDepth}
+                        options={[
+                          { label: "Quick Scan (pslist, pstree)", value: "quick" },
+                          { label: "Standard Scan (+netscan, cmdline)", value: "standard" },
+                          { label: "Deep Forensic Scan (+malfind, vadinfo)", value: "deep" },
+                        ]}
+                      />
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
-          </div>
+            </>
+          )}
 
           {/* Progress Bar — visible only when processing */}
           {stage !== 'idle' && (

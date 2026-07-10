@@ -13,7 +13,7 @@ const lines = [
   "0xfffffa8006e1...  424   wininit.exe      3        78",
   "[!] Anomalous execution detected at 0xfffffa8007a...",
   "[+] Extracting VAD node...",
-  "[LLM] Gemma 3 evaluating unstructured string artifacts...",
+  "[LLM] Gemma 4 evaluating unstructured string artifacts...",
   "[LLM] MATCH: Cobalt Strike Beacon (Confidence: 98%)",
   "[LLM] Extracted IOC: 192.168.1.105:443",
   "[SYS] Analysis cycle complete. Awaiting instruction."
