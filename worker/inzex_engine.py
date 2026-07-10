@@ -167,16 +167,26 @@ async def analyze_with_ai(volatility_results: list[dict], human_feedback: Option
 
     full_prompt = f"<|system|>\n{SYSTEM_PROMPT}\n<|user|>\n{user_content}\n<|assistant|>\n"
 
-    # --- vLLM path (AMD ROCm) ---
+    # --- JSON extraction helpers ---
     import re
-    def clean_json_markdown(text: str) -> str:
-        """Removes markdown code blocks (e.g. ```json ... ```)"""
-        text = text.strip()
-        match = re.search(r"```(?:json)?\s*(.*?)\s*```", text, re.DOTALL)
-        if match:
-            return match.group(1).strip()
-        return text
 
+    def extract_json(text: str) -> dict:
+        """Robustly extract the first JSON object from model output.
+        Handles: markdown fences, leading/trailing text, control characters."""
+        text = text.strip()
+        # Strip markdown fences
+        fenced = re.search(r"```(?:json)?\s*(.*?)\s*```", text, re.DOTALL)
+        if fenced:
+            text = fenced.group(1).strip()
+        # Find first {...} block
+        brace_match = re.search(r"\{.*\}", text, re.DOTALL)
+        if brace_match:
+            text = brace_match.group(0)
+        # Remove control characters that break json.loads (except \n \r \t)
+        text = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]', '', text)
+        return json.loads(text)
+
+    # --- vLLM path (AMD ROCm) ---
     try:
         from vllm import SamplingParams
         sampling_params = SamplingParams(temperature=0.1, max_tokens=4096)
@@ -184,7 +194,7 @@ async def analyze_with_ai(volatility_results: list[dict], human_feedback: Option
         output_text = ""
         async for request_output in llm_engine.generate(full_prompt, sampling_params, request_id=request_id):
             output_text = request_output.outputs[0].text
-        return json.loads(clean_json_markdown(output_text))
+        return extract_json(output_text)
     except Exception as e:
         print(f"[-] vLLM inference failed ({e}). Trying fallback.")
 
@@ -200,7 +210,7 @@ async def analyze_with_ai(volatility_results: list[dict], human_feedback: Option
                 max_tokens=4096,
             )
             raw_content = response.choices[0].message.content
-            return json.loads(clean_json_markdown(raw_content))
+            return extract_json(raw_content)
         except Exception as e2:
             print(f"[-] Fireworks fallback also failed: {e2}")
 

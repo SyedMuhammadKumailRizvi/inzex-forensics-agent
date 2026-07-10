@@ -5,9 +5,10 @@ import { createClient } from '@/lib/supabase/client';
 interface AIFindingProps {
   finding: Finding | null;
   onUpdate?: () => void;
+  onReevaluating?: (val: boolean) => void;
 }
 
-export function AIFinding({ finding, onUpdate }: AIFindingProps) {
+export function AIFinding({ finding, onUpdate, onReevaluating }: AIFindingProps) {
   const [feedback, setFeedback] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
@@ -28,6 +29,7 @@ export function AIFinding({ finding, onUpdate }: AIFindingProps) {
   const handleSubmitFeedback = async () => {
     if (!feedback.trim()) return;
     setSubmitting(true);
+    if (onReevaluating) onReevaluating(true);
     const supabase = createClient();
     await supabase.from('cases').update({ status: 'analyzing' }).eq('id', finding.case_id);
     await supabase.from('findings').update({ 
@@ -35,7 +37,6 @@ export function AIFinding({ finding, onUpdate }: AIFindingProps) {
       human_feedback: feedback
     }).eq('id', finding.id);
 
-    // Call onUpdate to refresh UI immediately to show rechecking state
     if (onUpdate) onUpdate();
 
     const amdBackendUrl = process.env.NEXT_PUBLIC_AMD_BACKEND_URL || "http://localhost:8000";
@@ -51,7 +52,6 @@ export function AIFinding({ finding, onUpdate }: AIFindingProps) {
     
     setSubmitting(false);
     setFeedback("");
-    // Call onUpdate again when done
     if (onUpdate) onUpdate();
   };
 
