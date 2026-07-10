@@ -93,7 +93,7 @@ def run_volatility_plugin(file_path: str, plugin: str) -> dict:
     """Run one Volatility 3 plugin against file_path. Returns structured dict."""
     try:
         cmd = ["python3", "vol.py", "-f", file_path, plugin, "--json"]
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=3600)
         rows = []
         if result.stdout:
             try:
@@ -114,20 +114,32 @@ def run_volatility_plugin(file_path: str, plugin: str) -> dict:
 SYSTEM_PROMPT = (
     "You are a Senior SOC Analyst performing memory forensics. "
     "Analyze the following Volatility 3 output and produce a structured incident report.\n\n"
-    "IMPORTANT: Be honest and accurate. If the memory image shows NO signs of compromise, "
-    "return an empty findings array and state that in the threat_narrative. "
+    "IMPORTANT: Be honest and accurate. Look for ANY signs of compromise: anomalous parent-child process trees, "
+    "suspicious established network connections, signs of hooking/rootkits, hidden command lines, or injected memory regions. "
+    "If the memory image shows NO signs of compromise, return an empty findings array and state that in the threat_narrative. "
     "Do NOT fabricate or invent findings. Only report genuine anomalies you observe in the data.\n\n"
+    "CRITICAL FORENSIC REQUIREMENTS:\n"
+    "IF an attack is present, explicitly reconstruct the attack killchain and highlight specific artifacts in your findings and threat_narrative. "
+    "Specifically, hunt for the following types of artifacts (but ONLY report them if they actually exist in the data — do NOT invent them):\n"
+    "- The target Operating System / Volatility Profile\n"
+    "- Process IDs (PIDs) of notable apps (e.g., notepad.exe) and infected processes (e.g., Meterpreter)\n"
+    "- Child processes spawned by suspicious binaries (e.g., wscript.exe)\n"
+    "- The exact IP address of the compromised machine and the Attacker IP\n"
+    "- Processes associated with suspicious DLLs (e.g., VCRUNTIME140.dll)\n"
+    "- Specific memory protection constants for anomalous VAD nodes (e.g., PAGE_EXECUTE_READWRITE)\n"
+    "- Names of executed VBS scripts, short names of file records, and timestamps of executed applications.\n\n"
+    "AGAIN: Do NOT fabricate or invent findings. If the memory image is completely clean, return an empty findings array, BUT you MUST use the threat_narrative to explicitly explain WHY it is considered clean (e.g., normal parent-child process relationships, lack of suspicious network connections, clean memory regions).\n\n"
     "For each genuine finding return:\n"
     "{\n"
     '  "findings": [\n'
     "    {\n"
     '      "title": "string",\n'
     '      "description": "string",\n'
-    '      "mitre_technique_id": "T1055",\n'
-    '      "mitre_technique_name": "Process Injection",\n'
+    '      "mitre_technique_id": "string (e.g. T1055, T1071, T1574, etc.)",\n'
+    '      "mitre_technique_name": "string",\n'
     '      "confidence": "high|medium|low",\n'
-    '      "evidence_plugin": "windows.malfind",\n'
-    '      "evidence_line": "exact line from volatility output"\n'
+    '      "evidence_plugin": "string (the volatility plugin name)",\n'
+    '      "evidence_line": "exact line or summary from volatility output"\n'
     "    }\n"
     "  ],\n"
     '  "threat_narrative": "string — overall summary of the threat landscape or confirmation of clean state",\n'
@@ -219,6 +231,15 @@ def create_case_record(case_number: str, examiner_name: str, org: str, classific
 def commit_findings(case_id: str, plugin_results: list[dict], ai_report: dict) -> int:
     """Insert one findings row per AI finding. Returns count of rows inserted."""
     findings = ai_report.get("findings", [])
+    if len(findings) == 0:
+        findings.append({
+            "title": "System Baseline Analysis",
+            "description": ai_report.get("threat_narrative", "The memory footprint aligns with baseline operating system behavior."),
+            "mitre_technique_id": "System",
+            "mitre_technique_name": "Baseline Verification",
+            "confidence": "info",
+            "evidence_plugin": "General",
+        })
     rows_inserted = 0
     for finding in findings:
         plugin_name = finding.get("evidence_plugin", "windows.pslist")
@@ -243,7 +264,7 @@ def commit_findings(case_id: str, plugin_results: list[dict], ai_report: dict) -
 
 
 def _confidence_to_severity(confidence: str) -> str:
-    return {"high": "Critical", "medium": "High", "low": "Medium"}.get(confidence.lower(), "Medium")
+    return {"high": "Critical", "medium": "High", "low": "Medium", "info": "Info", "clean": "Info"}.get(confidence.lower(), "Info")
 
 # ---------------------------------------------------------------------------
 # Background Task Pipeline
@@ -349,32 +370,27 @@ async def reevaluate(req: ReevaluateRequest, background_tasks: BackgroundTasks):
     async def bg_reevaluate(finding_id, feedback):
         try:
             # fetch raw json
-            resp = supabase.table("findings").select("volatility_raw_json").eq("id", finding_id).single().execute()
+            resp = supabase.table("findings").select("volatility_raw_json, ai_rationale").eq("id", finding_id).single().execute()
             if not resp.data: return
-            raw_json = resp.data["volatility_raw_json"]
+            raw_json = resp.data.get("volatility_raw_json", {})
+            original_rationale = resp.data.get("ai_rationale", "")
             
             # run AI
             ai_report = await analyze_with_ai([raw_json], human_feedback=feedback)
             findings_list = ai_report.get("findings", [])
             
-            # Guard: if AI returned no findings (engine unavailable), don't overwrite
             if not findings_list:
-                print(f"[-] Reevaluation returned no findings (AI likely unavailable). Preserving original.")
-                supabase.table("findings").update({
-                    "status": "completed",
-                    "human_feedback": feedback
-                }).eq("id", finding_id).execute()
-                return
+                new_rationale_text = ai_report.get("threat_narrative", "Re-evaluation completed. Check findings.")
+            else:
+                new_rationale_text = findings_list[0].get("description", "Re-evaluation completed.")
             
-            finding_data = findings_list[0]
+            threaded_rationale = f"{original_rationale}|||REEVAL|||{new_rationale_text}"
             
             # update with real AI output
             supabase.table("findings").update({
-                "severity": _confidence_to_severity(finding_data.get("confidence", "low")),
-                "ai_rationale": finding_data.get("description", "Re-evaluation complete."),
-                "mitre_technique": f"{finding_data.get('mitre_technique_id', '')} {finding_data.get('mitre_technique_name', '')}".strip(),
                 "status": "completed",
-                "human_feedback": feedback
+                "human_feedback": feedback,
+                "ai_rationale": threaded_rationale
             }).eq("id", finding_id).execute()
             print(f"[+] Reevaluation complete for finding {finding_id}")
         except Exception as e:

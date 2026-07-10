@@ -23,17 +23,25 @@ export function AIFinding({ finding, onUpdate, onReevaluating }: AIFindingProps)
   const handleApprove = async () => {
     const supabase = createClient();
     await supabase.from('findings').update({ status: 'approved' }).eq('id', finding.id);
-    // Notify backend to clean up temp files
-    const amdBackendUrl = process.env.NEXT_PUBLIC_AMD_BACKEND_URL || "http://localhost:8000";
-    try {
-      await fetch(`${amdBackendUrl}/approve`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ case_id: finding.case_id })
-      });
-    } catch (err) {
-      console.error("Failed to notify backend for file cleanup:", err);
+    
+    // Check if this is the last finding to be approved
+    const { data: allFindings } = await supabase.from('findings').select('status, id').eq('case_id', finding.case_id);
+    const everythingApproved = allFindings && allFindings.every(f => f.id === finding.id ? true : f.status === 'approved');
+
+    if (everythingApproved) {
+      // Notify backend to clean up temp files
+      const amdBackendUrl = process.env.NEXT_PUBLIC_AMD_BACKEND_URL || "http://localhost:8000";
+      try {
+        await fetch(`${amdBackendUrl}/approve`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ case_id: finding.case_id })
+        });
+      } catch (err) {
+        console.error("Failed to notify backend for file cleanup:", err);
+      }
     }
+    
     if (onUpdate) onUpdate();
   };
 
@@ -106,13 +114,30 @@ export function AIFinding({ finding, onUpdate, onReevaluating }: AIFindingProps)
         </div>
       )}
       
-      <div className="conf-note" style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 18, padding: '10px 12px', background: 'var(--amber-dim)', border: '1px solid #4A3A15', borderRadius: 6 }}>
-        {finding.severity} finding — {finding.ai_rationale?.split('.')[0] + '.' || 'Detected suspicious behavior.'}
-      </div>
-      
-      <p className="rationale" style={{ fontSize: 13, lineHeight: 1.6, color: 'var(--text-secondary)', marginBottom: 18, margin: 0 }}>
-        {finding.ai_rationale}
-      </p>
+      {(() => {
+        const parts = (finding.ai_rationale || '').split('|||REEVAL|||');
+        const original = parts[0] || 'No analysis available.';
+        const reevals = parts.slice(1);
+        
+        return (
+          <>
+            <div className="conf-note" style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 18, padding: '10px 12px', background: 'var(--amber-dim)', border: '1px solid #4A3A15', borderRadius: 6 }}>
+              {finding.severity} finding — {original.split('.')[0] + '.' || 'Detected suspicious behavior.'}
+            </div>
+            
+            <p className="rationale" style={{ fontSize: 13, lineHeight: 1.6, color: 'var(--text-secondary)', marginBottom: reevals.length > 0 ? 12 : 18, margin: 0, whiteSpace: 'pre-wrap' }}>
+              {original}
+            </p>
+
+            {reevals.map((reeval, idx) => (
+              <div key={idx} style={{ marginTop: 12, padding: '12px', background: 'rgba(157, 0, 255, 0.05)', border: '1px solid rgba(157, 0, 255, 0.2)', borderRadius: 6 }}>
+                <p style={{ fontSize: 10, letterSpacing: 1.5, textTransform: 'uppercase', color: '#B366FF', margin: '0 0 6px', fontWeight: 600 }}>🔄 Re-evaluation Analysis</p>
+                <p style={{ fontSize: 13, lineHeight: 1.6, color: '#e0e0e0', margin: 0, whiteSpace: 'pre-wrap' }}>{reeval}</p>
+              </div>
+            ))}
+          </>
+        );
+      })()}
       
       <div className="review-actions" style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 20, marginTop: 18 }}>
         <textarea 

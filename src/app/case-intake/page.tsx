@@ -251,10 +251,7 @@ export default function CaseIntakePage() {
                         value={osProfile}
                         onChange={setOsProfile}
                         options={[
-                          { label: "Automatic Detection (Recommended)", value: "auto" },
-                          { label: "Windows (x86/x64)", value: "windows" },
-                          { label: "Linux (x64)", value: "linux" },
-                          { label: "macOS (x64)", value: "macos" }
+                          { label: "Auto-Detect Profile (Volatility 3)", value: "auto" }
                         ]}
                       />
                     </div>
@@ -264,9 +261,7 @@ export default function CaseIntakePage() {
                         value={analysisDepth}
                         onChange={setAnalysisDepth}
                         options={[
-                          { label: "Quick Scan (pslist, pstree)", value: "quick" },
-                          { label: "Standard Scan (+netscan, cmdline)", value: "standard" },
-                          { label: "Deep Forensic Scan (+malfind, vadinfo)", value: "deep" },
+                          { label: "Comprehensive Memory Sweep (Volatility 3 + Gemma 4)", value: "deep" },
                         ]}
                       />
                     </div>

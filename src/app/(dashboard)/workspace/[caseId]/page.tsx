@@ -2,6 +2,7 @@
 
 import { useEffect, useState, use } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { EvidenceLog } from '@/components/workspace/evidence-log';
 import { AIFinding } from '@/components/workspace/ai-finding';
@@ -11,9 +12,9 @@ import { Case, Finding, Evidence } from '@/types/database';
 
 const PRINT_CSS = `
 @media print {
-  @page { margin: 15mm; size: A4; }
-  body { background: #fff !important; color: #1a1a1a !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-  .app { padding: 0 !important; max-width: 100% !important; background: #fff !important; }
+  @page { margin: 0; size: A4; }
+  body { background: #08080C !important; color: #e0e0e0 !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; margin: 0 !important; padding: 0 !important; }
+  .app { padding: 0 !important; max-width: 100% !important; background: #08080C !important; }
   .hide-on-print { display: none !important; }
   .print-only { display: block !important; }
   * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
@@ -23,6 +24,7 @@ const PRINT_CSS = `
 
 export default function Workspace({ params }: { params: Promise<{ caseId: string }> }) {
   const { caseId } = use(params);
+  const router = useRouter();
   
   const [caseData, setCaseData] = useState<Case | null>(null);
   const [evidence, setEvidence] = useState<Evidence | null>(null);
@@ -79,10 +81,13 @@ export default function Workspace({ params }: { params: Promise<{ caseId: string
     fetchData();
 
     const interval = setInterval(() => {
-      setFindings(currentFindings => {
-        const needsPolling = currentFindings.some(f => f.status === 'rechecking');
-        if (needsPolling) fetchData();
-        return currentFindings;
+      setCaseData(currentCase => {
+        setFindings(currentFindings => {
+          const needsPolling = currentCase?.status === 'processing' || currentFindings.some(f => f.status === 'rechecking');
+          if (needsPolling) fetchData();
+          return currentFindings;
+        });
+        return currentCase;
       });
     }, 3000);
 
@@ -134,39 +139,6 @@ export default function Workspace({ params }: { params: Promise<{ caseId: string
     <div className="app print-friendly">
       <style dangerouslySetInnerHTML={{ __html: PRINT_CSS }} />
 
-      {/* ── Full-page re-evaluation overlay ─────────────────── */}
-      {isReevaluating && (
-        <div style={{
-          position: 'fixed', inset: 0, background: 'rgba(10,10,15,0.96)', backdropFilter: 'blur(8px)',
-          display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center',
-          zIndex: 9999,
-        }}>
-          <style dangerouslySetInnerHTML={{ __html: `
-            @keyframes pulse-bar { 0% { left: -50%; } 100% { left: 110%; } }
-            @keyframes fadeInUp { from { opacity:0; transform: translateY(20px); } to { opacity:1; transform: translateY(0); } }
-          ` }} />
-          <div style={{ textAlign: 'center', animation: 'fadeInUp 0.4s ease', maxWidth: 440 }}>
-            <div style={{ width: 60, height: 60, borderRadius: '50%', background: 'var(--red-dim)', border: '1px solid var(--red-glow)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px' }}>
-              <svg width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} style={{ color: '#D6A6FF' }}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9.75 3.104v5.714a2.25 2.25 0 01-.659 1.591L5 14.5M9.75 3.104c-.251.023-.501.05-.75.082m.75-.082a24.301 24.301 0 014.5 0m0 0v5.714c0 .597.237 1.17.659 1.591L19.8 15.3M14.25 3.104c.251.023.501.05.75.082M19.8 15.3l-1.57.393A9.065 9.065 0 0112 15a9.065 9.065 0 00-6.23-.693L5 14.5m14.8.8l1.402 1.402c1.232 1.232.65 3.318-1.067 3.611A48.309 48.309 0 0112 21c-2.773 0-5.491-.235-8.135-.687-1.718-.293-2.3-2.379-1.067-3.61L5 14.5" />
-              </svg>
-            </div>
-            <p style={{ fontFamily: 'var(--mono)', fontSize: 13, color: '#D6A6FF', textTransform: 'uppercase', letterSpacing: 2, marginBottom: 10 }}>
-              Re-evaluating with Gemma 4
-            </p>
-            <p style={{ fontSize: 13, color: 'var(--text-tertiary)', marginBottom: 28, lineHeight: 1.6 }}>
-              Your feedback has been dispatched to the AMD ROCm inference engine. The finding will update automatically when complete.
-            </p>
-            <div style={{ width: '100%', height: 4, background: 'var(--bg-raised)', borderRadius: 2, overflow: 'hidden', position: 'relative' }}>
-              <div style={{ position: 'absolute', top: 0, height: '100%', width: '45%', background: 'linear-gradient(90deg, transparent, var(--red), transparent)', animation: 'pulse-bar 1.8s infinite ease-in-out' }} />
-            </div>
-            <p style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 12 }}>
-              This typically takes 15–45 seconds
-            </p>
-          </div>
-        </div>
-      )}
-
       {/* ── Case header ─────────────────────────────────────── */}
       <div className="case-header hide-on-print" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', borderBottom: '1px solid var(--border)', paddingBottom: 20, marginBottom: 28 }}>
         <div>
@@ -215,12 +187,64 @@ export default function Workspace({ params }: { params: Promise<{ caseId: string
               <path id="thread-path" d="" style={{ fill: 'none', stroke: 'var(--red)', strokeWidth: 1.5, strokeDasharray: '6 4', opacity: 0.85 }} />
             </svg>
 
+            {/* ── All Approved Overlay ── */}
+            {findings.length > 0 && findings.every(f => f.status === 'approved') && (
+              <div style={{ position: 'absolute', inset: -10, zIndex: 50, background: 'rgba(10,10,15,0.7)', backdropFilter: 'blur(8px)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', borderRadius: 12, border: '1px solid rgba(76, 175, 80, 0.2)' }}>
+                <div style={{ width: 64, height: 64, borderRadius: '50%', background: 'rgba(76, 175, 80, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid rgba(76,175,80,0.5)', marginBottom: 20 }}>
+                  <svg width="32" height="32" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} style={{ color: '#4CAF50' }}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+                <h3 style={{ margin: '0 0 10px', fontSize: 24, color: '#fff', letterSpacing: 1 }}>Case Closed</h3>
+                <p style={{ margin: '0 0 30px', color: '#aaa', fontSize: 14 }}>All findings have been reviewed and approved. Evidence securely wiped.</p>
+                <div style={{ display: 'flex', gap: 16 }}>
+                  <button onClick={() => router.push('/')} style={{ padding: '10px 24px', background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 6, color: '#fff', cursor: 'pointer', fontFamily: 'var(--sans)', fontSize: 13 }}>Return to Dashboard</button>
+                  <button onClick={() => router.push('/case-intake')} style={{ padding: '10px 24px', background: 'var(--red-dim)', border: '1px solid var(--red-glow)', borderRadius: 6, color: '#D6A6FF', cursor: 'pointer', fontFamily: 'var(--sans)', fontSize: 13 }}>Start New Case</button>
+                </div>
+              </div>
+            )}
+
+            {/* ── Re-evaluating Overlay ── */}
+            {isReevaluating && (
+              <div style={{
+                position: 'absolute', inset: -10, background: 'rgba(10,10,15,0.85)', backdropFilter: 'blur(6px)', borderRadius: 12,
+                display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center',
+                zIndex: 40, border: '1px solid var(--border)'
+              }}>
+                <style dangerouslySetInnerHTML={{ __html: `
+                  @keyframes pulse-bar { 0% { left: -50%; } 100% { left: 110%; } }
+                  @keyframes fadeInUp { from { opacity:0; transform: translateY(20px); } to { opacity:1; transform: translateY(0); } }
+                ` }} />
+                <div style={{ textAlign: 'center', animation: 'fadeInUp 0.4s ease', maxWidth: 440 }}>
+                  <div style={{ width: 60, height: 60, borderRadius: '50%', background: 'var(--red-dim)', border: '1px solid var(--red-glow)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px' }}>
+                    <svg width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} style={{ color: '#D6A6FF' }}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9.75 3.104v5.714a2.25 2.25 0 01-.659 1.591L5 14.5M9.75 3.104c-.251.023-.501.05-.75.082m.75-.082a24.301 24.301 0 014.5 0m0 0v5.714c0 .597.237 1.17.659 1.591L19.8 15.3M14.25 3.104c.251.023.501.05.75.082M19.8 15.3l-1.57.393A9.065 9.065 0 0112 15a9.065 9.065 0 00-6.23-.693L5 14.5m14.8.8l1.402 1.402c1.232 1.232.65 3.318-1.067 3.611A48.309 48.309 0 0112 21c-2.773 0-5.491-.235-8.135-.687-1.718-.293-2.3-2.379-1.067-3.61L5 14.5" />
+                    </svg>
+                  </div>
+                  <p style={{ fontFamily: 'var(--mono)', fontSize: 13, color: '#D6A6FF', textTransform: 'uppercase', letterSpacing: 2, marginBottom: 10 }}>
+                    Re-evaluating with Gemma 4
+                  </p>
+                  <p style={{ fontSize: 13, color: 'var(--text-tertiary)', marginBottom: 28, lineHeight: 1.6 }}>
+                    Your feedback has been dispatched to the AMD ROCm inference engine. The finding will update automatically when complete.
+                  </p>
+                  <div style={{ width: '100%', height: 4, background: 'var(--bg-raised)', borderRadius: 2, overflow: 'hidden', position: 'relative' }}>
+                    <div style={{ position: 'absolute', top: 0, height: '100%', width: '45%', background: 'linear-gradient(90deg, transparent, var(--red), transparent)', animation: 'pulse-bar 1.8s infinite ease-in-out' }} />
+                  </div>
+                  <p style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 12 }}>
+                    This typically takes 15–45 seconds
+                  </p>
+                </div>
+              </div>
+            )}
+
             <div className="panel" style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 10, padding: 18, display: 'flex', flexDirection: 'column' }}>
               <p style={{ fontSize: 11, letterSpacing: 1.5, textTransform: 'uppercase', color: 'var(--text-tertiary)', margin: '0 0 3px' }}>Forensic Analysis Stages</p>
               <p style={{ fontSize: 13, color: 'var(--text-secondary)', margin: '0 0 16px' }}>Volatility 3 Plugins executed</p>
 
-              {findings.length === 0 ? (
+              {caseData.status === 'processing' ? (
                 <p style={{ color: 'var(--text-tertiary)', fontSize: 13, padding: 12 }}>Waiting for Unicorn Engine analysis to complete...</p>
+              ) : findings.length === 0 ? (
+                <p style={{ color: 'var(--text-tertiary)', fontSize: 13, padding: 12 }}>✓ Analysis complete. No threats detected.</p>
               ) : (
                 findings.map(f => (
                   <div
@@ -272,25 +296,25 @@ export default function Workspace({ params }: { params: Promise<{ caseId: string
           PRINT-ONLY REPORT — Dark branded PDF
       ───────────────────────────────────────────────────── */}
       {/* ─────────────────────────────────────────────────────
-          PRINT-ONLY REPORT — Professional White Corporate PDF
+          PRINT-ONLY REPORT — Professional Dark Corporate PDF
       ───────────────────────────────────────────────────── */}
-      <div className="print-only" style={{ fontFamily: "'Segoe UI', Arial, sans-serif", color: '#1a1a1a', lineHeight: 1.6 }}>
+      <div className="print-only" style={{ fontFamily: "'Inter', 'Segoe UI', Arial, sans-serif", color: '#e0e0e0', lineHeight: 1.6, padding: '20mm', background: '#08080C', minHeight: '100vh', boxSizing: 'border-box' }}>
 
         {/* ── Report Cover Header ── */}
-        <div style={{ borderBottom: '3px solid #9D00FF', paddingBottom: 24, marginBottom: 28 }}>
+        <div style={{ borderBottom: '1px solid rgba(157, 0, 255, 0.3)', paddingBottom: 24, marginBottom: 32 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <div>
-              <p style={{ fontFamily: 'monospace', fontSize: 11, letterSpacing: 3, textTransform: 'uppercase', color: '#9D00FF', margin: '0 0 6px 0', fontWeight: 600 }}>
+              <p style={{ fontFamily: 'monospace', fontSize: 11, letterSpacing: 4, textTransform: 'uppercase', color: '#B366FF', margin: '0 0 8px 0', fontWeight: 600 }}>
                 Inzex Forensics — Unicorn Engine
               </p>
-              <h1 style={{ fontSize: 28, fontWeight: 800, margin: '0 0 4px 0', color: '#111', textTransform: 'uppercase', letterSpacing: 1 }}>
+              <h1 style={{ fontSize: 24, fontWeight: 700, margin: '0 0 6px 0', color: '#ffffff', textTransform: 'uppercase', letterSpacing: 1.5 }}>
                 Memory Forensics Incident Report
               </h1>
-              <p style={{ fontSize: 12, color: '#666', margin: 0 }}>
+              <p style={{ fontSize: 12, color: '#888', margin: 0, textTransform: 'uppercase', letterSpacing: 1 }}>
                 Confidential — For Authorized Personnel Only
               </p>
             </div>
-            <div style={{ textAlign: 'right', fontSize: 11, color: '#888', lineHeight: 1.8 }}>
+            <div style={{ textAlign: 'right', fontSize: 10, color: '#aaa', lineHeight: 1.8 }}>
               <p style={{ margin: 0 }}>Generated: {new Date().toLocaleString()}</p>
               <p style={{ margin: 0 }}>Engine: Volatility 3 + Gemma 4</p>
               <p style={{ margin: 0 }}>Platform: AMD ROCm Accelerated</p>
@@ -299,7 +323,7 @@ export default function Workspace({ params }: { params: Promise<{ caseId: string
         </div>
 
         {/* ── Case Metadata Grid ── */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 16, marginBottom: 28, padding: '16px 20px', background: '#f8f8fa', border: '1px solid #e5e5ea', borderRadius: 8 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 16, marginBottom: 36, padding: '20px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 6 }}>
           {[
             ['Case Designation', caseData.case_designation],
             ['Memory Source', evidence?.file_name || 'N/A'],
@@ -307,82 +331,65 @@ export default function Workspace({ params }: { params: Promise<{ caseId: string
             ['Total Findings', String(findings.length)],
           ].map(([label, val]) => (
             <div key={label}>
-              <p style={{ fontSize: 9, textTransform: 'uppercase', letterSpacing: 2, color: '#999', margin: '0 0 4px 0', fontWeight: 600 }}>{label}</p>
-              <p style={{ fontSize: 13, fontWeight: 600, color: '#222', margin: 0 }}>{val}</p>
+              <p style={{ fontSize: 9, textTransform: 'uppercase', letterSpacing: 2, color: '#888', margin: '0 0 6px 0', fontWeight: 600 }}>{label}</p>
+              <p style={{ fontSize: 13, fontWeight: 500, color: '#fff', margin: 0 }}>{val}</p>
             </div>
           ))}
         </div>
 
-        {/* ── Two-Column: Executive Summary + Key Findings ── */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 28 }}>
-          {/* Left: Executive Summary */}
-          <div style={{ padding: '16px 20px', background: '#f8f8fa', border: '1px solid #e5e5ea', borderRadius: 8 }}>
-            <p style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 2, color: '#9D00FF', fontWeight: 700, margin: '0 0 10px 0', borderBottom: '1px solid #e5e5ea', paddingBottom: 8 }}>
-              Executive Summary
-            </p>
-            <p style={{ fontSize: 12, color: '#444', lineHeight: 1.7, margin: 0 }}>
-              Memory forensics analysis of <strong>{evidence?.file_name}</strong> identified <strong>{findings.length}</strong> finding{findings.length !== 1 ? 's' : ''} requiring analyst review.
-              {findings.filter(f => f.severity === 'Critical').length > 0 && (
-                <> <strong style={{ color: '#d32f2f' }}>{findings.filter(f => f.severity === 'Critical').length} critical-severity</strong> finding{findings.filter(f => f.severity === 'Critical').length !== 1 ? 's were' : ' was'} detected.</>
-              )}
-              {findings.length === 0 && ' No anomalies were detected — the memory image appears clean.'}
-            </p>
-          </div>
-
-          {/* Right: Key Findings Bullet Points */}
-          <div style={{ padding: '16px 20px', background: '#f8f8fa', border: '1px solid #e5e5ea', borderRadius: 8 }}>
-            <p style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 2, color: '#9D00FF', fontWeight: 700, margin: '0 0 10px 0', borderBottom: '1px solid #e5e5ea', paddingBottom: 8 }}>
-              Key Findings at a Glance
-            </p>
-            {findings.length === 0 ? (
-              <p style={{ fontSize: 12, color: '#888', margin: 0 }}>No threats identified.</p>
-            ) : (
-              <ul style={{ margin: 0, padding: '0 0 0 16px', listStyleType: 'disc' }}>
-                {findings.map((f, i) => (
-                  <li key={i} style={{ fontSize: 12, color: '#444', lineHeight: 1.6, marginBottom: 4 }}>
-                    <strong style={{ color: f.severity === 'Critical' ? '#d32f2f' : f.severity === 'High' ? '#e65100' : '#555' }}>
-                      [{f.severity}]
-                    </strong>{' '}
-                    {f.mitre_technique || 'Memory anomaly'} — {f.plugin_name}
-                  </li>
-                ))}
-              </ul>
+        {/* ── Executive Summary (Text Flow, No Box) ── */}
+        <div style={{ marginBottom: 44, paddingRight: '15%' }}>
+          <h2 style={{ fontSize: 14, textTransform: 'uppercase', letterSpacing: 3, color: '#B366FF', fontWeight: 600, margin: '0 0 16px 0', paddingBottom: 8 }}>
+            Executive Summary
+          </h2>
+          <p style={{ fontSize: 13, color: '#ccc', lineHeight: 1.8, margin: '0 0 16px 0' }}>
+            Memory forensics analysis of <strong style={{ color: '#fff' }}>{evidence?.file_name}</strong> was conducted utilizing the Inzex Unicorn Engine. The platform executed a full diagnostic sweep targeting process injection, anomalous network connections, and hidden command-line executions.
+          </p>
+          <p style={{ fontSize: 13, color: '#ccc', lineHeight: 1.8, margin: 0 }}>
+            The AI inference engine identified <strong style={{ color: '#fff' }}>{findings.length}</strong> finding{findings.length !== 1 ? 's' : ''} requiring analyst review. 
+            {findings.filter(f => f.severity === 'Critical').length > 0 && (
+              <> Specifically, <strong style={{ color: '#ff5252' }}>{findings.filter(f => f.severity === 'Critical').length} critical-severity</strong> anomaly{findings.filter(f => f.severity === 'Critical').length !== 1 ? 'ies were' : ' was'} detected which strongly suggests active compromise.</>
             )}
-          </div>
-        </div>
-
-        {/* ── Detailed Findings ── */}
-        <div style={{ marginBottom: 20 }}>
-          <p style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 2, color: '#9D00FF', fontWeight: 700, margin: '0 0 16px 0', borderBottom: '2px solid #9D00FF', paddingBottom: 8, display: 'inline-block' }}>
-            Detailed Finding Analysis
+            {findings.length === 0 && ' No anomalies or indicators of compromise (IoCs) were detected. The memory footprint aligns with baseline operating system behavior.'}
+            {findings.length > 0 && findings.every(f => f.severity === 'Info') && ' The analysis returned only baseline informational findings. No malicious anomalies were identified.'}
+            {' '}This report details the technical artifacts extracted directly from the physical memory image.
           </p>
         </div>
 
+        {/* ── Detailed Findings ── */}
+        <div style={{ marginBottom: 24 }}>
+          <h2 style={{ fontSize: 14, textTransform: 'uppercase', letterSpacing: 3, color: '#B366FF', fontWeight: 600, margin: '0 0 20px 0', paddingBottom: 8 }}>
+            Indicators of Compromise & Analysis
+          </h2>
+        </div>
+
         {findings.length === 0 ? (
-          <div style={{ padding: '20px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 8, textAlign: 'center' }}>
-            <p style={{ fontSize: 14, color: '#166534', fontWeight: 600, margin: 0 }}>✓ No threats detected — Memory image is clean</p>
+          <div style={{ padding: '20px', background: 'rgba(76, 175, 80, 0.05)', border: '1px solid rgba(76, 175, 80, 0.2)', borderRadius: 6, textAlign: 'center' }}>
+            <p style={{ fontSize: 14, color: '#81c784', fontWeight: 500, margin: 0 }}>✓ No threats detected — Memory image is clean</p>
           </div>
         ) : (
           findings.map((f, idx) => {
-            const sevColor = { Critical: '#d32f2f', High: '#e65100', Medium: '#f57c00', Low: '#2e7d32', Info: '#1976d2' }[f.severity || 'Info'] || '#666';
+            const sevColor = { Critical: '#ff5252', High: '#ff9800', Medium: '#ffb74d', Low: '#81c784', Info: '#4fc3f7' }[f.severity || 'Info'] || '#888';
+            const sevBg = { Critical: 'rgba(255, 82, 82, 0.05)', High: 'rgba(255, 152, 0, 0.05)', Medium: 'rgba(255, 183, 77, 0.05)', Low: 'rgba(129, 199, 132, 0.05)', Info: 'rgba(79, 195, 247, 0.05)' }[f.severity || 'Info'] || 'transparent';
+            
             return (
-              <div key={f.id} style={{ border: '1px solid #e5e5ea', borderLeft: `4px solid ${sevColor}`, borderRadius: 8, padding: '18px 22px', marginBottom: 16, pageBreakInside: 'avoid', background: '#fff' }}>
+              <div key={f.id} style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)', borderLeft: `3px solid ${sevColor}`, borderRadius: 6, padding: '24px', marginBottom: 24, pageBreakInside: 'avoid' }}>
                 {/* Finding header */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12, borderBottom: '1px solid #f0f0f0', paddingBottom: 12 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20, borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: 16 }}>
                   <div>
-                    <p style={{ fontSize: 10, letterSpacing: 2, color: '#999', textTransform: 'uppercase', margin: '0 0 4px 0', fontWeight: 600 }}>
-                      Finding {idx + 1} — {f.plugin_name}
+                    <p style={{ fontSize: 10, letterSpacing: 2, color: '#888', textTransform: 'uppercase', margin: '0 0 8px 0', fontWeight: 600 }}>
+                      Finding {idx + 1} — Artifact: <code style={{ color: '#B366FF', background: 'rgba(157,0,255,0.1)', padding: '3px 8px', borderRadius: 4, fontFamily: 'monospace' }}>{f.plugin_name}</code>
                     </p>
-                    <p style={{ fontSize: 16, fontWeight: 700, color: '#111', margin: 0 }}>
-                      {f.mitre_technique || 'Memory Analysis Finding'}
+                    <p style={{ fontSize: 16, fontWeight: 600, color: '#fff', margin: 0 }}>
+                      {f.mitre_technique || 'Anomalous Memory Region'}
                     </p>
                   </div>
                   <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0 }}>
-                    <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 4, color: '#fff', background: sevColor }}>
+                    <span style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600, padding: '6px 14px', borderRadius: 4, color: sevColor, background: sevBg, border: `1px solid ${sevColor}` }}>
                       {f.severity}
                     </span>
                     {f.status === 'approved' && (
-                      <span style={{ fontSize: 10, fontWeight: 600, padding: '3px 10px', borderRadius: 4, color: '#2e7d32', background: '#e8f5e9', border: '1px solid #c8e6c9' }}>
+                      <span style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600, padding: '6px 14px', borderRadius: 4, color: '#81c784', background: 'rgba(129, 199, 132, 0.1)', border: '1px solid #81c784' }}>
                         ✓ Approved
                       </span>
                     )}
@@ -390,16 +397,33 @@ export default function Workspace({ params }: { params: Promise<{ caseId: string
                 </div>
 
                 {/* AI Rationale */}
-                <div style={{ marginBottom: f.human_feedback ? 14 : 0 }}>
-                  <p style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 2, color: '#999', fontWeight: 600, margin: '0 0 6px 0' }}>AI Analysis</p>
-                  <p style={{ fontSize: 13, lineHeight: 1.7, color: '#333', margin: 0 }}>{f.ai_rationale || 'No analysis available.'}</p>
+                <div style={{ marginBottom: f.human_feedback ? 20 : 0 }}>
+                  <p style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 2, color: '#B366FF', fontWeight: 600, margin: '0 0 10px 0' }}>AI Contextual Analysis</p>
+                  
+                  {(() => {
+                    const parts = (f.ai_rationale || '').split('|||REEVAL|||');
+                    const original = parts[0] || 'No analysis available.';
+                    const reevals = parts.slice(1);
+                    return (
+                      <>
+                        <p style={{ fontSize: 13, lineHeight: 1.8, color: '#ccc', margin: 0, whiteSpace: 'pre-wrap' }}>{original}</p>
+                        
+                        {reevals.map((reeval, idx) => (
+                          <div key={idx} style={{ marginTop: 16, padding: '14px', background: 'rgba(157,0,255,0.05)', borderLeft: '3px solid #B366FF', borderRadius: '0 6px 6px 0' }}>
+                            <p style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 2, color: '#B366FF', fontWeight: 600, margin: '0 0 6px 0' }}>🔄 Re-evaluation Analysis</p>
+                            <p style={{ fontSize: 13, lineHeight: 1.8, color: '#fff', margin: 0, whiteSpace: 'pre-wrap' }}>{reeval}</p>
+                          </div>
+                        ))}
+                      </>
+                    );
+                  })()}
                 </div>
 
                 {/* Analyst Feedback */}
                 {f.human_feedback && (
-                  <div style={{ marginTop: 12, padding: '10px 14px', background: '#f8f8fa', borderLeft: '3px solid #9D00FF', borderRadius: '0 6px 6px 0' }}>
-                    <p style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: 2, color: '#999', fontWeight: 600, margin: '0 0 4px 0' }}>Analyst Feedback</p>
-                    <p style={{ fontSize: 12, lineHeight: 1.6, color: '#555', margin: 0, fontStyle: 'italic' }}>"{f.human_feedback}"</p>
+                  <div style={{ marginTop: 16, padding: '12px 16px', background: 'rgba(0,0,0,0.2)', borderLeft: '3px solid #B366FF', borderRadius: '0 6px 6px 0' }}>
+                    <p style={{ fontSize: 9, textTransform: 'uppercase', letterSpacing: 2, color: '#777', fontWeight: 600, margin: '0 0 6px 0' }}>Human Analyst Notes</p>
+                    <p style={{ fontSize: 13, lineHeight: 1.6, color: '#bbb', margin: 0, fontStyle: 'italic' }}>"{f.human_feedback}"</p>
                   </div>
                 )}
               </div>
@@ -408,11 +432,11 @@ export default function Workspace({ params }: { params: Promise<{ caseId: string
         )}
 
         {/* ── Footer ── */}
-        <div style={{ marginTop: 40, paddingTop: 16, borderTop: '2px solid #e5e5ea', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <p style={{ fontSize: 10, color: '#aaa', margin: 0 }}>
+        <div style={{ marginTop: 48, paddingTop: 20, borderTop: '1px solid rgba(255,255,255,0.1)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <p style={{ fontSize: 10, color: '#666', margin: 0 }}>
             Inzex Forensics — Unicorn Engine • AMD ROCm • Volatility 3 • Gemma 4
           </p>
-          <p style={{ fontSize: 10, color: '#aaa', margin: 0 }}>
+          <p style={{ fontSize: 10, color: '#666', margin: 0 }}>
             Page 1 of 1 • {new Date().toLocaleDateString()}
           </p>
         </div>
