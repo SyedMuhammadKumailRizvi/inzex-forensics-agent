@@ -63,6 +63,11 @@ To fulfill the requirements for the Gemma Bounty, **Gemma 4 is hosted locally on
 
 The Python worker node extracts malicious artifacts from raw memory dumps using Volatility 3 (CPU bounded), and then pipes the raw hex/terminal output directly into the locally hosted Gemma 4 model (GPU bounded). The AI acts as a **General Purpose Anomaly Detector**, scanning for injected regions, hooking, and anomalous networks. 
 
+### 🛡️ Robust Token Management & Auto-Recovery
+Memory forensics tools like Volatility produce massive datasets (often >8MB of JSON). To prevent AI context window limits from crashing the pipeline, the Unicorn Engine employs:
+- **Dynamic Context Pruning:** Automatically strips noisy Volatility metadata (e.g., `Offset(V)`, `Wow64`) and trims row limits before piping into Gemma 4.
+- **Graceful JSON Salvaging:** If Gemma 4 identifies too many injected memory regions and hits the hard output token limit, the backend intercepts the resulting `JSONDecodeError`, naively salvages the partial output string by force-closing the JSON tree, and preserves all generated findings instead of discarding the analysis.
+
 ### Interactive Threaded Review
 If the AI flags a finding (or if it reports a completely clean baseline), the analyst can select the finding in the Next.js UI and type a question (e.g. *"Look at the raw pslist. Are there any suspicious child processes of explorer.exe?"*). This triggers a `/reevaluate` POST request back to the AMD backend, which queries Gemma 4 against the raw JSON data and **threads the response** back to the UI.
 
@@ -104,19 +109,39 @@ Dashboard available at `http://localhost:3000`.
 
 ### 3. Deploy the Unicorn Engine (AMD FastAPI)
 
-On your AMD Developer Cloud ROCm instance, copy the `worker/` directory and run:
+Our backend runs on a remote AMD Developer Cloud instance inside a Docker container (to utilize ROCm and vLLM). Follow these steps to deploy the Python worker:
 
+**1. Transfer the backend script to your AMD server:**
 ```bash
-# Install dependencies
-pip install -r requirements.txt
-
-# Start the engine (must run on port exposed to public IP for large files)
-uvicorn inzex_engine:app --host 0.0.0.0 --port 8000
+# SCP from your local machine to the remote AMD server
+scp "/path/to/local/inzex-forensics-agent/worker/inzex_engine.py" root@<YOUR_AMD_SERVER_IP>:/tmp/inzex_engine.py
 ```
+
+**2. Copy the script into the ROCm Docker container:**
+```bash
+# SSH into your AMD server and start the ROCm container
+docker start rocm
+
+# Copy the file from the host into the running container
+docker cp /tmp/inzex_engine.py rocm:/app/inzex_engine.py
+```
+
+**3. Start the FastAPI server and expose it:**
+```bash
+# Start the FastAPI engine inside the container (e.g., via uvicorn)
+# Then, expose the local port 8000 using a Cloudflare Tunnel
+cloudflared tunnel --url http://localhost:8000 > tunnel.log 2>&1 &
+
+# Retrieve your public Cloudflare Tunnel URL
+grep -o 'https://.*\.trycloudflare\.com' tunnel.log
+```
+> **⚠️ Important Cloudflare & Netlify Limitation:** Cloudflare Tunnels strictly reject HTTP requests larger than 100MB. If you are accessing the backend via a Cloudflare Tunnel or the frontend via Netlify, you cannot upload full multi-gigabyte memory dumps. To test the complete AI pipeline, please use the provided `dummy_evidence.vmem` (1MB) included in the root of this repository.
+
+*Note: Ensure you update your frontend `.env.local` (and the environment variables in Netlify or Vercel) with the resulting Cloudflare Tunnel URL as `NEXT_PUBLIC_AMD_BACKEND_URL`.*
 
 ## 📦 Required Deliverables
 
 - [x] Public GitHub Repository
 - [ ] Demo Video (Pending)
 - [ ] Slide Deck PDF (Pending)
-- [ ] Live Demo URL (Pending)
+- [x] Live Demo URL: [https://inzexdemo.netlify.app](https://inzexdemo.netlify.app) *(Note: the AMD ROCm backend is actively running, so you can test live using `dummy_evidence.vmem`)*

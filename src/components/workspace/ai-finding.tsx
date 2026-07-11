@@ -152,11 +152,6 @@ export function AIFinding({ finding, onUpdate, onReevaluating }: AIFindingProps)
         </button>
       </div>
       
-      <div className="review-actions" style={{ display: 'flex', gap: 8, marginTop: 'auto' }}>
-        <button onClick={handleApprove} disabled={finding.status === 'approved'} className="btn btn-confirm" style={{ flex: 1, fontFamily: 'var(--sans)', fontSize: 13, fontWeight: 500, padding: '9px 0', borderRadius: 6, border: '1px solid var(--border)', background: finding.status === 'approved' ? 'rgba(76, 175, 80, 0.1)' : 'var(--bg-raised)', color: finding.status === 'approved' ? '#4CAF50' : 'var(--text-secondary)', cursor: finding.status === 'approved' ? 'not-allowed' : 'pointer' }}>
-          {finding.status === 'approved' ? 'Approved' : 'Approve Finding'}
-        </button>
-      </div>
     </div>
   );
 }

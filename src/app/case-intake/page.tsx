@@ -34,7 +34,8 @@ export default function CaseIntakePage() {
   const [leadInvestigator, setLeadInvestigator] = useState("");
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
 
-  const [osProfile, setOsProfile] = useState("windows");
+  const [engineVersion, setEngineVersion] = useState("vol3");
+  const [vol2Profile, setVol2Profile] = useState("Win7SP1x64");
   const [analysisDepth, setAnalysisDepth] = useState("standard");
 
   const [stage, setStage] = useState<UploadStage>('idle');
@@ -73,6 +74,11 @@ export default function CaseIntakePage() {
       formData.append("examiner_name", leadInvestigator || "Investigator");
       formData.append("org", "Inzex Forensics");
       formData.append("classification", referenceId || "UNCLASSIFIED");
+      formData.append("engine_version", engineVersion);
+      if (engineVersion === "vol2") {
+        formData.append("vol2_profile", vol2Profile);
+      }
+
       selectedFiles.forEach(file => {
         formData.append("files", file);
       });
@@ -244,24 +250,38 @@ export default function CaseIntakePage() {
                   <p className="text-sm text-zinc-500 mt-1">Configure profile targeting and AI depth.</p>
                 </div>
                 <div className="p-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="relative z-50">
-                      <label className="block text-[11px] font-semibold text-zinc-500 mb-2 uppercase tracking-widest">Symbol Operating System Hint</label>
+                  <div className="grid grid-cols-1 gap-6 mb-6">
+                    <div className="relative z-[60]">
+                      <label className="block text-[11px] font-semibold text-zinc-500 mb-2 uppercase tracking-widest">Volatility Engine Version</label>
                       <CustomSelect
-                        value={osProfile}
-                        onChange={setOsProfile}
+                        value={engineVersion}
+                        onChange={setEngineVersion}
                         options={[
-                          { label: "Auto-Detect Profile (Volatility 3)", value: "auto" }
+                          { label: "Volatility 3 (Auto-Profile via PDBs)", value: "vol3" },
+                          { label: "Volatility 2 (Legacy Manual Profile)", value: "vol2" }
                         ]}
                       />
                     </div>
-                    <div className="relative z-50">
+                  </div>
+
+                  {engineVersion === 'vol2' && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                      <div className="relative z-50">
+                        <label className="block text-[11px] font-semibold text-[#D6A6FF] mb-2 uppercase tracking-widest">Vol2 OS Profile String</label>
+                        <Input value={vol2Profile} onChange={(e) => setVol2Profile(e.target.value)} type="text" placeholder="e.g. Win7SP1x64" className="bg-[#121215] border-[#D6A6FF]/30 shadow-inner text-white" />
+                        <p className="text-xs text-zinc-500 mt-2">Required for Volatility 2 to parse structures.</p>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="relative z-40">
                       <label className="block text-[11px] font-semibold text-zinc-500 mb-2 uppercase tracking-widest">Analysis Depth</label>
                       <CustomSelect
                         value={analysisDepth}
                         onChange={setAnalysisDepth}
                         options={[
-                          { label: "Comprehensive Memory Sweep (Volatility 3 + Gemma 4)", value: "deep" },
+                          { label: `Comprehensive Sweep (${engineVersion === 'vol3' ? 'Vol 3' : 'Vol 2'} + Gemma 4)`, value: "deep" },
                         ]}
                       />
                     </div>

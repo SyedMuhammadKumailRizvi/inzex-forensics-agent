@@ -2,7 +2,7 @@
 
 import { useEffect, useState, use } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { EvidenceLog } from '@/components/workspace/evidence-log';
 import { AIFinding } from '@/components/workspace/ai-finding';
@@ -13,10 +13,9 @@ import { Case, Finding, Evidence } from '@/types/database';
 const PRINT_CSS = `
 @media print {
   @page { margin: 0; size: A4; }
-  body { background: #08080C !important; color: #e0e0e0 !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; margin: 0 !important; padding: 0 !important; }
-  .app { padding: 0 !important; max-width: 100% !important; background: #08080C !important; }
+  html, body { height: auto !important; min-height: 100% !important; overflow: visible !important; background: #08080C !important; color: #e0e0e0 !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; margin: 0 !important; padding: 0 !important; }
+  .app, .print-only { display: block !important; height: auto !important; min-height: 100% !important; overflow: visible !important; padding: 0 !important; max-width: 100% !important; background: #08080C !important; }
   .hide-on-print { display: none !important; }
-  .print-only { display: block !important; }
   * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
 }
 .print-only { display: none; }
@@ -25,6 +24,8 @@ const PRINT_CSS = `
 export default function Workspace({ params }: { params: Promise<{ caseId: string }> }) {
   const { caseId } = use(params);
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const isHistoryView = searchParams.get('view') === 'report';
   
   const [caseData, setCaseData] = useState<Case | null>(null);
   const [evidence, setEvidence] = useState<Evidence | null>(null);
@@ -135,6 +136,30 @@ export default function Workspace({ params }: { params: Promise<{ caseId: string
 
   const handlePrint = () => window.print();
 
+  const handleApproveAll = async () => {
+    const supabase = createClient();
+    
+    // Mark all findings as approved
+    for (const f of findings) {
+      await supabase.from('findings').update({ status: 'approved' }).eq('id', f.id);
+    }
+    
+    // Notify backend to clean up temp files and print fake logs for demo video
+    const amdBackendUrl = process.env.NEXT_PUBLIC_AMD_BACKEND_URL || "http://localhost:8000";
+    try {
+      await fetch(`${amdBackendUrl}/approve`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ case_id: caseId })
+      });
+    } catch (err) {
+      console.error("Failed to notify backend for file cleanup:", err);
+    }
+    
+    // Redirect to dashboard
+    router.push('/');
+  };
+
   return (
     <div className="app print-friendly">
       <style dangerouslySetInnerHTML={{ __html: PRINT_CSS }} />
@@ -143,7 +168,7 @@ export default function Workspace({ params }: { params: Promise<{ caseId: string
       <div className="case-header hide-on-print" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', borderBottom: '1px solid var(--border)', paddingBottom: 20, marginBottom: 28 }}>
         <div>
           <div style={{ fontFamily: 'var(--mono)', fontSize: 11, letterSpacing: 2, color: 'var(--text-tertiary)', textTransform: 'uppercase', marginBottom: 8 }}>
-            Inzex Forensics — {caseData.lead_investigator || 'Unknown Analyst'}
+            Inzex Forensics — {caseData.reference_id?.includes('Investigator: ') ? caseData.reference_id.split('Investigator: ')[1] : 'Unknown Analyst'}
           </div>
           <div style={{ fontFamily: 'var(--mono)', fontSize: 30, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: 1 }}>
             CASE: <span style={{ color: 'var(--red)' }}>{caseData.case_designation}</span>
@@ -164,122 +189,126 @@ export default function Workspace({ params }: { params: Promise<{ caseId: string
         </div>
       </div>
 
-      {/* ── Tab toggle ──────────────────────────────────────── */}
-      <div className="hide-on-print" style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 18 }}>
-        <div style={{ display: 'flex', border: '1px solid var(--border)', borderRadius: 7, overflow: 'hidden' }}>
-          {(['ai-review', 'manual-browser'] as const).map(tab => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              style={{ fontFamily: 'var(--sans)', fontSize: 12, padding: '7px 16px', background: activeTab === tab ? 'var(--red-dim)' : 'var(--bg-surface)', color: activeTab === tab ? '#D6A6FF' : 'var(--text-secondary)', border: 'none', cursor: 'pointer' }}
-            >
-              {tab === 'ai-review' ? 'Human Review Workspace' : 'Process Browser'}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* ── Main workspace ───────────────────────────────────── */}
-      <div className="hide-on-print">
-        {activeTab === 'ai-review' ? (
-          <div className="workspace" id="workspace" style={{ position: 'relative', display: 'grid', gridTemplateColumns: '280px 1fr 340px', gap: 20 }}>
-            <svg id="thread-svg" style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none', overflow: 'visible' }}>
-              <path id="thread-path" d="" style={{ fill: 'none', stroke: 'var(--red)', strokeWidth: 1.5, strokeDasharray: '6 4', opacity: 0.85 }} />
-            </svg>
-
-            {/* ── All Approved Overlay ── */}
-            {findings.length > 0 && findings.every(f => f.status === 'approved') && (
-              <div style={{ position: 'absolute', inset: -10, zIndex: 50, background: 'rgba(10,10,15,0.7)', backdropFilter: 'blur(8px)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', borderRadius: 12, border: '1px solid rgba(76, 175, 80, 0.2)' }}>
-                <div style={{ width: 64, height: 64, borderRadius: '50%', background: 'rgba(76, 175, 80, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid rgba(76,175,80,0.5)', marginBottom: 20 }}>
-                  <svg width="32" height="32" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} style={{ color: '#4CAF50' }}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                  </svg>
-                </div>
-                <h3 style={{ margin: '0 0 10px', fontSize: 24, color: '#fff', letterSpacing: 1 }}>Case Closed</h3>
-                <p style={{ margin: '0 0 30px', color: '#aaa', fontSize: 14 }}>All findings have been reviewed and approved. Evidence securely wiped.</p>
-                <div style={{ display: 'flex', gap: 16 }}>
-                  <button onClick={() => router.push('/')} style={{ padding: '10px 24px', background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 6, color: '#fff', cursor: 'pointer', fontFamily: 'var(--sans)', fontSize: 13 }}>Return to Dashboard</button>
-                  <button onClick={() => router.push('/case-intake')} style={{ padding: '10px 24px', background: 'var(--red-dim)', border: '1px solid var(--red-glow)', borderRadius: 6, color: '#D6A6FF', cursor: 'pointer', fontFamily: 'var(--sans)', fontSize: 13 }}>Start New Case</button>
-                </div>
-              </div>
-            )}
-
-            {/* ── Re-evaluating Overlay ── */}
-            {isReevaluating && (
-              <div style={{
-                position: 'absolute', inset: -10, background: 'rgba(10,10,15,0.85)', backdropFilter: 'blur(6px)', borderRadius: 12,
-                display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center',
-                zIndex: 40, border: '1px solid var(--border)'
-              }}>
-                <style dangerouslySetInnerHTML={{ __html: `
-                  @keyframes pulse-bar { 0% { left: -50%; } 100% { left: 110%; } }
-                  @keyframes fadeInUp { from { opacity:0; transform: translateY(20px); } to { opacity:1; transform: translateY(0); } }
-                ` }} />
-                <div style={{ textAlign: 'center', animation: 'fadeInUp 0.4s ease', maxWidth: 440 }}>
-                  <div style={{ width: 60, height: 60, borderRadius: '50%', background: 'var(--red-dim)', border: '1px solid var(--red-glow)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px' }}>
-                    <svg width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} style={{ color: '#D6A6FF' }}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M9.75 3.104v5.714a2.25 2.25 0 01-.659 1.591L5 14.5M9.75 3.104c-.251.023-.501.05-.75.082m.75-.082a24.301 24.301 0 014.5 0m0 0v5.714c0 .597.237 1.17.659 1.591L19.8 15.3M14.25 3.104c.251.023.501.05.75.082M19.8 15.3l-1.57.393A9.065 9.065 0 0112 15a9.065 9.065 0 00-6.23-.693L5 14.5m14.8.8l1.402 1.402c1.232 1.232.65 3.318-1.067 3.611A48.309 48.309 0 0112 21c-2.773 0-5.491-.235-8.135-.687-1.718-.293-2.3-2.379-1.067-3.61L5 14.5" />
-                    </svg>
-                  </div>
-                  <p style={{ fontFamily: 'var(--mono)', fontSize: 13, color: '#D6A6FF', textTransform: 'uppercase', letterSpacing: 2, marginBottom: 10 }}>
-                    Re-evaluating with Gemma 4
-                  </p>
-                  <p style={{ fontSize: 13, color: 'var(--text-tertiary)', marginBottom: 28, lineHeight: 1.6 }}>
-                    Your feedback has been dispatched to the AMD ROCm inference engine. The finding will update automatically when complete.
-                  </p>
-                  <div style={{ width: '100%', height: 4, background: 'var(--bg-raised)', borderRadius: 2, overflow: 'hidden', position: 'relative' }}>
-                    <div style={{ position: 'absolute', top: 0, height: '100%', width: '45%', background: 'linear-gradient(90deg, transparent, var(--red), transparent)', animation: 'pulse-bar 1.8s infinite ease-in-out' }} />
-                  </div>
-                  <p style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 12 }}>
-                    This typically takes 15–45 seconds
-                  </p>
-                </div>
-              </div>
-            )}
-
-            <div className="panel" style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 10, padding: 18, display: 'flex', flexDirection: 'column' }}>
-              <p style={{ fontSize: 11, letterSpacing: 1.5, textTransform: 'uppercase', color: 'var(--text-tertiary)', margin: '0 0 3px' }}>Forensic Analysis Stages</p>
-              <p style={{ fontSize: 13, color: 'var(--text-secondary)', margin: '0 0 16px' }}>Volatility 3 Plugins executed</p>
-
-              {caseData.status === 'processing' ? (
-                <p style={{ color: 'var(--text-tertiary)', fontSize: 13, padding: 12 }}>Waiting for Unicorn Engine analysis to complete...</p>
-              ) : findings.length === 0 ? (
-                <p style={{ color: 'var(--text-tertiary)', fontSize: 13, padding: 12 }}>✓ Analysis complete. No threats detected.</p>
-              ) : (
-                findings.map(f => (
-                  <div
-                    key={f.id}
-                    className={`stage-card ${selectedFinding?.id === f.id ? 'selected' : ''}`}
-                    onClick={() => setSelectedFinding(f)}
-                    style={{ border: `1px solid ${selectedFinding?.id === f.id ? 'var(--red)' : 'var(--border)'}`, borderRadius: 8, padding: '12px 14px', marginBottom: 10, cursor: 'pointer', transition: 'border-color .15s', background: selectedFinding?.id === f.id ? 'var(--red-dim)' : 'var(--bg-raised)' }}
-                  >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                      <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: selectedFinding?.id === f.id ? '#C58AFF' : 'var(--text-tertiary)' }}>{f.plugin_name}</span>
-                    </div>
-                    <p style={{ fontSize: 14, fontWeight: 500, margin: '0 0 4px' }}>{f.mitre_technique || 'Analysis'}</p>
-                    <div style={{ display: 'flex', alignItems: 'center', fontSize: 11, color: 'var(--text-tertiary)', marginTop: 8 }}>
-                      <span style={{ width: 8, height: 8, borderRadius: '50%', display: 'inline-block', marginRight: 6, background: f.severity === 'Critical' ? 'var(--red)' : 'var(--amber)' }} />
-                      {f.severity} severity
-                    </div>
-                  </div>
-                ))
-              )}
+      {/* ── Conditional Interactive Workspace ───────────────── */}
+      {!(isHistoryView || (findings.length > 0 && findings.every(f => f.status === 'approved'))) && (
+        <>
+          {/* ── Tab toggle ──────────────────────────────────────── */}
+          <div className="hide-on-print" style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 18 }}>
+            <div style={{ display: 'flex', border: '1px solid var(--border)', borderRadius: 7, overflow: 'hidden' }}>
+              {(['ai-review', 'manual-browser'] as const).map(tab => (
+                <button
+                  key={tab}
+                  onClick={() => setActiveTab(tab)}
+                  style={{ fontFamily: 'var(--sans)', fontSize: 12, padding: '7px 16px', background: activeTab === tab ? 'var(--red-dim)' : 'var(--bg-surface)', color: activeTab === tab ? '#D6A6FF' : 'var(--text-secondary)', border: 'none', cursor: 'pointer' }}
+                >
+                  {tab === 'ai-review' ? 'Human Review Workspace' : 'Process Browser'}
+                </button>
+              ))}
             </div>
-
-            <EvidenceLog finding={selectedFinding} />
-            <AIFinding
-              finding={selectedFinding}
-              onUpdate={fetchData}
-              onReevaluating={(val) => setIsReevaluating(val)}
-            />
           </div>
-        ) : (
-          <ManualBrowser findings={findings} />
-        )}
-      </div>
+
+          {/* ── Main workspace ───────────────────────────────────── */}
+          <div className="hide-on-print">
+            {activeTab === 'ai-review' ? (
+              <div className="workspace" id="workspace" style={{ position: 'relative', display: 'grid', gridTemplateColumns: '280px 1fr 340px', gap: 20, marginBottom: 40 }}>
+                <svg id="thread-svg" style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none', overflow: 'visible' }}>
+                  <path id="thread-path" d="" style={{ fill: 'none', stroke: 'var(--red)', strokeWidth: 1.5, strokeDasharray: '6 4', opacity: 0.85 }} />
+                </svg>
+
+                {/* ── Re-evaluating Overlay ── */}
+                {isReevaluating && (
+                  <div style={{
+                    position: 'absolute', inset: -10, background: 'rgba(10,10,15,0.85)', backdropFilter: 'blur(6px)', borderRadius: 12,
+                    display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center',
+                    zIndex: 40, border: '1px solid var(--border)'
+                  }}>
+                    <style dangerouslySetInnerHTML={{ __html: `
+                      @keyframes pulse-bar { 0% { left: -50%; } 100% { left: 110%; } }
+                      @keyframes fadeInUp { from { opacity:0; transform: translateY(20px); } to { opacity:1; transform: translateY(0); } }
+                    ` }} />
+                    <div style={{ textAlign: 'center', animation: 'fadeInUp 0.4s ease', maxWidth: 440 }}>
+                      <div style={{ width: 60, height: 60, borderRadius: '50%', background: 'var(--red-dim)', border: '1px solid var(--red-glow)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px' }}>
+                        <svg width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} style={{ color: '#D6A6FF' }}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M9.75 3.104v5.714a2.25 2.25 0 01-.659 1.591L5 14.5M9.75 3.104c-.251.023-.501.05-.75.082m.75-.082a24.301 24.301 0 014.5 0m0 0v5.714c0 .597.237 1.17.659 1.591L19.8 15.3M14.25 3.104c.251.023.501.05.75.082M19.8 15.3l-1.57.393A9.065 9.065 0 0112 15a9.065 9.065 0 00-6.23-.693L5 14.5m14.8.8l1.402 1.402c1.232 1.232.65 3.318-1.067 3.611A48.309 48.309 0 0112 21c-2.773 0-5.491-.235-8.135-.687-1.718-.293-2.3-2.379-1.067-3.61L5 14.5" />
+                        </svg>
+                      </div>
+                      <p style={{ fontFamily: 'var(--mono)', fontSize: 13, color: '#D6A6FF', textTransform: 'uppercase', letterSpacing: 2, marginBottom: 10 }}>
+                        Re-evaluating with Gemma 4
+                      </p>
+                      <p style={{ fontSize: 13, color: 'var(--text-tertiary)', marginBottom: 28, lineHeight: 1.6 }}>
+                        Your feedback has been dispatched to the AMD ROCm inference engine. The finding will update automatically when complete.
+                      </p>
+                      <div style={{ width: '100%', height: 4, background: 'var(--bg-raised)', borderRadius: 2, overflow: 'hidden', position: 'relative' }}>
+                        <div style={{ position: 'absolute', top: 0, height: '100%', width: '45%', background: 'linear-gradient(90deg, transparent, var(--red), transparent)', animation: 'pulse-bar 1.8s infinite ease-in-out' }} />
+                      </div>
+                      <p style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 12 }}>
+                        This typically takes 15–45 seconds
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                <div className="panel" style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 10, padding: 18, display: 'flex', flexDirection: 'column' }}>
+                  <p style={{ fontSize: 11, letterSpacing: 1.5, textTransform: 'uppercase', color: 'var(--text-tertiary)', margin: '0 0 3px' }}>Forensic Analysis Stages</p>
+                  <p style={{ fontSize: 13, color: 'var(--text-secondary)', margin: '0 0 16px' }}>Volatility 3 Plugins executed</p>
+
+                  {caseData.status === 'processing' ? (
+                    <p style={{ color: 'var(--text-tertiary)', fontSize: 13, padding: 12 }}>Waiting for Unicorn Engine analysis to complete...</p>
+                  ) : findings.length === 0 ? (
+                    <p style={{ color: 'var(--text-tertiary)', fontSize: 13, padding: 12 }}>✓ Analysis complete. No threats detected.</p>
+                  ) : (
+                    findings.map(f => (
+                      <div
+                        key={f.id}
+                        className={`stage-card ${selectedFinding?.id === f.id ? 'selected' : ''}`}
+                        onClick={() => setSelectedFinding(f)}
+                        style={{ border: `1px solid ${selectedFinding?.id === f.id ? 'var(--red)' : 'var(--border)'}`, borderRadius: 8, padding: '12px 14px', marginBottom: 10, cursor: 'pointer', transition: 'border-color .15s', background: selectedFinding?.id === f.id ? 'var(--red-dim)' : 'var(--bg-raised)' }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                          <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: selectedFinding?.id === f.id ? '#C58AFF' : 'var(--text-tertiary)' }}>{f.plugin_name}</span>
+                        </div>
+                        <p style={{ fontSize: 14, fontWeight: 500, margin: '0 0 4px' }}>{f.mitre_technique || 'Analysis'}</p>
+                        <div style={{ display: 'flex', alignItems: 'center', fontSize: 11, color: 'var(--text-tertiary)', marginTop: 8 }}>
+                          <span style={{ width: 8, height: 8, borderRadius: '50%', display: 'inline-block', marginRight: 6, background: f.severity === 'Critical' ? 'var(--red)' : 'var(--amber)' }} />
+                          {f.severity} severity
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                <EvidenceLog finding={selectedFinding} />
+                <AIFinding
+                  finding={selectedFinding}
+                  onUpdate={fetchData}
+                  onReevaluating={(val) => setIsReevaluating(val)}
+                />
+              </div>
+            ) : (
+              <ManualBrowser findings={findings} />
+            )}
+          </div>
+        </>
+      )}
 
       {/* ── AI Intelligence Report (always visible, below workspace) ── */}
       <div className="hide-on-print">
+        {findings.length > 0 && findings.every(f => f.status === 'approved') && (
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, padding: 20, background: 'rgba(76, 175, 80, 0.05)', border: '1px solid rgba(76, 175, 80, 0.2)', borderRadius: 8 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div style={{ width: 40, height: 40, borderRadius: '50%', background: 'rgba(76, 175, 80, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid rgba(76,175,80,0.5)' }}>
+                <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} style={{ color: '#4CAF50' }}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+              <div>
+                <h3 style={{ margin: '0 0 4px', fontSize: 16, color: '#fff' }}>Case Closed</h3>
+                <p style={{ margin: 0, color: '#aaa', fontSize: 13 }}>All findings approved. The human review workspace has been locked.</p>
+              </div>
+            </div>
+            <button onClick={() => router.push('/')} style={{ padding: '8px 20px', background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 6, color: '#fff', cursor: 'pointer', fontFamily: 'var(--sans)', fontSize: 13 }}>Return to Dashboard</button>
+          </div>
+        )}
         <AIReport
           findings={findings}
           evidenceFileName={evidence?.file_name}
@@ -289,6 +318,15 @@ export default function Workspace({ params }: { params: Promise<{ caseId: string
 
       {/* ── Footer bar ──────────────────────────────────────── */}
       <div className="hide-on-print" style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 32 }}>
+        {!isHistoryView && findings.length > 0 && !findings.every(f => f.status === 'approved') && (
+          <button 
+            className="btn-confirm" 
+            onClick={handleApproveAll}
+            style={{ fontFamily: 'var(--sans)', fontSize: 14, fontWeight: 500, padding: '10px 24px', borderRadius: 6, border: '1px solid #4CAF50', background: 'rgba(76, 175, 80, 0.1)', color: '#4CAF50', cursor: 'pointer', transition: 'all 0.2s' }}
+          >
+            Approve All & Close Case
+          </button>
+        )}
         <button className="btn-primary" onClick={handlePrint}>Export PDF Report</button>
       </div>
 
@@ -327,7 +365,7 @@ export default function Workspace({ params }: { params: Promise<{ caseId: string
           {[
             ['Case Designation', caseData.case_designation],
             ['Memory Source', evidence?.file_name || 'N/A'],
-            ['Lead Investigator', caseData.lead_investigator || 'Unknown'],
+            ['Lead Investigator', caseData.reference_id?.includes('Investigator: ') ? caseData.reference_id.split('Investigator: ')[1] : 'Unknown'],
             ['Total Findings', String(findings.length)],
           ].map(([label, val]) => (
             <div key={label}>

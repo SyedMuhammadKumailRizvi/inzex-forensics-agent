@@ -6,7 +6,7 @@ The Memory Browser provides a granular, manual view of the data extracted from t
 ## Features
 - **Process Table:** A scannable list of processes including PID, Parent PID, Virtual Offsets, Threads, and Handles.
 - **Filtering:** A top filter bar simulating a query language (e.g., `Process == svchost.exe`).
-- **AI Flag Integration:** Rows flagged by Gemma 3 are highlighted in red and feature a badge, seamlessly tying manual browsing with AI analysis.
+- **AI Flag Integration:** Rows flagged by Gemma 4 are highlighted in red and feature a badge, seamlessly tying manual browsing with AI analysis.
 - **Detail Panel:** Clicking a row opens a breakdown of process properties and raw hex dumps for the memory offset.
 
 ## Data Flow

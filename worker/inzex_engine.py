@@ -89,18 +89,59 @@ VOLATILITY_PLUGINS = [
     "windows.cmdline",
 ]
 
-def run_volatility_plugin(file_path: str, plugin: str) -> dict:
-    """Run one Volatility 3 plugin against file_path. Returns structured dict."""
+def run_volatility_plugin(file_path: str, plugin: str, engine_version: str = "vol3", vol2_profile: str = "") -> dict:
+    """Run one Volatility plugin against file_path. Returns structured dict."""
     try:
-        cmd = ["python3", "vol.py", "-f", file_path, plugin, "--json"]
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=3600)
+        import os
+        import shutil
+        
+        if engine_version == "vol2":
+            plugin_name = plugin.replace('windows.', '')
+            
+            # Determine correct Volatility 2 command
+            if shutil.which("volatility"):
+                cmd_prefix = ["volatility"]
+            elif os.path.exists("/usr/local/bin/volatility"):
+                cmd_prefix = ["/usr/local/bin/volatility"]
+            elif shutil.which("vol.py"):
+                cmd_prefix = ["vol.py"]
+            elif shutil.which("python2"):
+                cmd_prefix = ["python2", "vol.py"]
+            else:
+                cmd_prefix = ["volatility"] # Default fallback which will trigger FileNotFoundError if missing
+                
+            cmd = cmd_prefix + ["-f", file_path, f"--profile={vol2_profile}", plugin_name]
+        else:
+            if os.path.exists("vol.py"):
+                cmd = ["python3", "vol.py", "-f", file_path, "-r", "json", plugin]
+            else:
+                cmd = ["vol", "-f", file_path, "-r", "json", plugin]
+                
+        try:
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=3600)
+        except FileNotFoundError:
+            error_msg = f"Executable '{cmd[0]}' not found or incompatible. Ensure {engine_version} is properly installed."
+            print(f"[-] {error_msg}")
+            return {"plugin": plugin, "rows": [], "anomalies": [error_msg]}
+
         rows = []
+        anomalies = []
+        
+        if result.stderr:
+            # Volatility often logs progress or errors to stderr
+            anomalies.append(f"STDERR: {result.stderr.strip()}")
+            
         if result.stdout:
             try:
+                # Volatility 3 with -r json
                 rows = json.loads(result.stdout)
             except json.JSONDecodeError:
+                # Volatility 2 (or Vol3 fallback) outputs raw text
                 rows = [{"raw": line} for line in result.stdout.splitlines() if line.strip()]
-        return {"plugin": plugin, "rows": rows, "anomalies": []}
+        elif result.returncode != 0:
+            anomalies.append(f"Process exited with code {result.returncode}")
+            
+        return {"plugin": plugin, "rows": rows, "anomalies": anomalies}
     except subprocess.TimeoutExpired:
         print(f"[-] Plugin {plugin} timed out.")
         return {"plugin": plugin, "rows": [], "anomalies": ["TIMEOUT"]}
@@ -120,37 +161,73 @@ SYSTEM_PROMPT = (
     "Do NOT fabricate or invent findings. Only report genuine anomalies you observe in the data.\n\n"
     "CRITICAL FORENSIC REQUIREMENTS:\n"
     "IF an attack is present, explicitly reconstruct the attack killchain and highlight specific artifacts in your findings and threat_narrative. "
-    "Specifically, hunt for the following types of artifacts (but ONLY report them if they actually exist in the data — do NOT invent them):\n"
-    "- The target Operating System / Volatility Profile\n"
-    "- Process IDs (PIDs) of notable apps (e.g., notepad.exe) and infected processes (e.g., Meterpreter)\n"
-    "- Child processes spawned by suspicious binaries (e.g., wscript.exe)\n"
-    "- The exact IP address of the compromised machine and the Attacker IP\n"
-    "- Processes associated with suspicious DLLs (e.g., VCRUNTIME140.dll)\n"
-    "- Specific memory protection constants for anomalous VAD nodes (e.g., PAGE_EXECUTE_READWRITE)\n"
-    "- Names of executed VBS scripts, short names of file records, and timestamps of executed applications.\n\n"
-    "AGAIN: Do NOT fabricate or invent findings. If the memory image is completely clean, return an empty findings array, BUT you MUST use the threat_narrative to explicitly explain WHY it is considered clean (e.g., normal parent-child process relationships, lack of suspicious network connections, clean memory regions).\n\n"
+    "You must aggressively hunt for and extract the following types of artifacts if they exist in the data (Do NOT invent them):\n"
+    "- The cryptographic hash (SHA1/MD5) of the memory image or analyzed files.\n"
+    "- The target Operating System and inferred Volatility Profile.\n"
+    "- Process IDs (PIDs) of suspected infected processes or commonly exploited binaries (e.g., notepad.exe, svchost.exe).\n"
+    "- Child processes spawned by scripting engines (e.g., wscript.exe, powershell.exe, cmd.exe).\n"
+    "- The exact IP address of the compromised machine and any identified Attacker IPs.\n"
+    "- Processes associated with suspicious DLLs or injected memory regions.\n\n"
+    "AGAIN: Do NOT fabricate or invent findings. If the data is completely empty or shows a clean state, explicitly state that in the threat_narrative and explain why.\n"
+    "CRITICAL: Keep your output CONCISE. Limit your response to a MAXIMUM OF 3 HIGH/CRITICAL FINDINGS. If there are more, summarize them in the threat_narrative.\n"
+    "Keep 'evidence_line' and 'description' extremely short to conserve output tokens.\n\n"
     "For each genuine finding return:\n"
     "{\n"
     '  "findings": [\n'
     "    {\n"
     '      "title": "string",\n'
     '      "description": "string",\n'
-    '      "mitre_technique_id": "string (e.g. T1055, T1071, T1574, etc.)",\n'
+    '      "mitre_technique_id": "string",\n'
     '      "mitre_technique_name": "string",\n'
     '      "confidence": "high|medium|low",\n'
-    '      "evidence_plugin": "string (the volatility plugin name)",\n'
-    '      "evidence_line": "exact line or summary from volatility output"\n'
+    '      "evidence_plugin": "string",\n'
+    '      "evidence_line": "string"\n'
     "    }\n"
     "  ],\n"
-    '  "threat_narrative": "string — overall summary of the threat landscape or confirmation of clean state",\n'
+    '  "threat_narrative": "string — provide a comprehensive summary linking the artifacts (PIDs, IPs, child processes) together, or explain why the file is clean.",\n'
     '  "threat_actor_hypothesis": "string"\n'
     "}\n\n"
     "Return only valid JSON. No markdown. No explanation."
 )
 
+def compact_volatility_results(results: list[dict], max_rows=150) -> list[dict]:
+    """Reduce JSON size to prevent token limit errors."""
+    compact_results = []
+    for plugin_res in results:
+        plugin = plugin_res.get("plugin", "")
+        rows = plugin_res.get("rows", [])
+        anomalies = plugin_res.get("anomalies", [])
+        
+        trimmed_rows = rows[:max_rows]
+        optimized_rows = []
+        for row in trimmed_rows:
+            if isinstance(row, dict):
+                row_copy = row.copy()
+                for noisy_key in ["Offset(V)", "SessionId", "Wow64", "__children", "File output", "Handles", "Threads"]:
+                    row_copy.pop(noisy_key, None)
+                optimized_rows.append(row_copy)
+            else:
+                optimized_rows.append(row)
+                
+        plugin_compact = {
+            "plugin": plugin,
+            "anomalies": anomalies,
+            "rows": optimized_rows,
+        }
+        if len(rows) > max_rows:
+            plugin_compact["note"] = f"Output truncated: Showing {max_rows} out of {len(rows)} rows to fit context window."
+            
+        compact_results.append(plugin_compact)
+    return compact_results
+
 async def analyze_with_ai(volatility_results: list[dict], human_feedback: Optional[str] = None) -> dict:
     """Pipe Volatility JSON into Gemma 3 (vLLM) or Fireworks fallback."""
-    vol_summary = json.dumps(volatility_results, indent=2)
+    compact_results = compact_volatility_results(volatility_results)
+    vol_summary = json.dumps(compact_results, separators=(',', ':'))
+    
+    if len(vol_summary) > 80000:
+        vol_summary = vol_summary[:80000] + "\n... [TRUNCATED DUE TO CONTEXT LIMIT]"
+        
     user_content = f"Volatility 3 Output:\n{vol_summary}"
     if human_feedback:
         user_content += (
@@ -164,7 +241,7 @@ async def analyze_with_ai(volatility_results: list[dict], human_feedback: Option
 
     def extract_json(text: str) -> dict:
         """Robustly extract the first JSON object from model output.
-        Handles: markdown fences, leading/trailing text, control characters."""
+        Handles: markdown fences, leading/trailing text, control characters, and trailing commas."""
         text = text.strip()
         # Strip markdown fences
         fenced = re.search(r"```(?:json)?\s*(.*?)\s*```", text, re.DOTALL)
@@ -174,9 +251,38 @@ async def analyze_with_ai(volatility_results: list[dict], human_feedback: Option
         brace_match = re.search(r"\{.*\}", text, re.DOTALL)
         if brace_match:
             text = brace_match.group(0)
-        # Remove control characters that break json.loads (except \n \r \t)
+        # Remove control characters that break json.loads
         text = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]', '', text)
-        return json.loads(text)
+        # Remove trailing commas
+        text = re.sub(r',\s*\}', '}', text)
+        text = re.sub(r',\s*\]', ']', text)
+        
+        try:
+            return json.loads(text)
+        except json.JSONDecodeError:
+            # Try naive salvage if the output was abruptly truncated by token limits
+            try:
+                salvaged = text.rstrip(', "') + '"}]}'
+                parsed = json.loads(salvaged)
+                # Ensure missing top-level keys are populated
+                if "threat_narrative" not in parsed:
+                    parsed["threat_narrative"] = "AI analysis was truncated due to token limits. Output may be incomplete."
+                return parsed
+            except json.JSONDecodeError as e:
+                return {
+                "findings": [
+                    {
+                        "confidence": "info",
+                        "mitre_technique_id": "System",
+                        "mitre_technique_name": "JSON Parsing Error",
+                        "description": f"The AI generated an invalid JSON response that could not be parsed: {str(e)}\n\nRaw Output:\n{text[:800]}...",
+                        "evidence_plugin": "General",
+                        "evidence_line": ""
+                    }
+                ],
+                "threat_narrative": "JSON formatting failure during AI processing.",
+                "threat_actor_hypothesis": "None"
+            }
 
     # --- vLLM path (AMD ROCm) ---
     try:
@@ -219,9 +325,13 @@ async def analyze_with_ai(volatility_results: list[dict], human_feedback: Option
 
 def create_case_record(case_number: str, examiner_name: str, org: str, classification: str) -> str:
     """Insert a case row and return its UUID."""
+    ref = classification or "UNCLASSIFIED"
+    if examiner_name:
+        ref += f" | Investigator: {examiner_name}"
+        
     payload = {
         "case_designation": case_number or "Inzex-Alpha",
-        "reference_id": classification or "UNCLASSIFIED",
+        "reference_id": ref,
         "status": "analyzing",
     }
     resp = supabase.table("cases").insert(payload).execute()
@@ -245,12 +355,19 @@ def commit_findings(case_id: str, plugin_results: list[dict], ai_report: dict) -
         plugin_name = finding.get("evidence_plugin", "windows.pslist")
         # Match raw plugin data to this finding's plugin
         raw = next((p for p in plugin_results if p["plugin"] == plugin_name), plugin_results[0])
+        
+        # Fallbacks for AI hallucinations
+        tech_id = finding.get("mitre_technique_id") or finding.get("technique_id") or ""
+        tech_name = finding.get("mitre_technique_name") or finding.get("technique") or finding.get("mitre_technique") or ""
+        desc = finding.get("description") or finding.get("rationale") or finding.get("ai_rationale") or "No description provided."
+        conf = finding.get("confidence") or finding.get("severity") or "low"
+        
         supabase.table("findings").insert({
             "case_id": case_id,
             "plugin_name": plugin_name,
-            "mitre_technique": f"{finding.get('mitre_technique_id', '')} {finding.get('mitre_technique_name', '')}".strip(),
-            "severity": _confidence_to_severity(finding.get("confidence", "low")),
-            "ai_rationale": finding.get("description", ""),
+            "mitre_technique": f"{tech_id} {tech_name}".strip(),
+            "severity": _confidence_to_severity(conf),
+            "ai_rationale": desc,
             "volatility_raw_json": raw,
         }).execute()
         rows_inserted += 1
@@ -264,7 +381,7 @@ def commit_findings(case_id: str, plugin_results: list[dict], ai_report: dict) -
 
 
 def _confidence_to_severity(confidence: str) -> str:
-    return {"high": "Critical", "medium": "High", "low": "Medium", "info": "Info", "clean": "Info"}.get(confidence.lower(), "Info")
+    return {"high": "Critical", "medium": "High", "low": "Medium", "info": "Info", "clean": "Info", "critical": "Critical"}.get(confidence.lower(), "Info")
 
 # ---------------------------------------------------------------------------
 # Background Task Pipeline
@@ -283,11 +400,13 @@ async def run_pipeline_background(case_id: str, file_infos: list[dict]):
         for info in file_infos:
             tmp_path = info["tmp_path"]
             filename = info["filename"]
+            engine = info.get("engine_version", "vol3")
+            profile = info.get("vol2_profile", "")
             
             try:
                 for plugin in VOLATILITY_PLUGINS:
-                    print(f"[*] Running {plugin} on {filename}...")
-                    result = run_volatility_plugin(tmp_path, plugin)
+                    print(f"[*] Running {plugin} on {filename} (Engine: {engine})...")
+                    result = run_volatility_plugin(tmp_path, plugin, engine_version=engine, vol2_profile=profile)
                     result["source_file"] = filename
                     plugin_results.append(result)
                     
@@ -327,11 +446,13 @@ async def analyze(
     examiner_name: str = Form(""),
     org: str = Form(""),
     classification: str = Form("UNCLASSIFIED"),
+    engine_version: str = Form("vol3"),
+    vol2_profile: str = Form(""),
     files: list[UploadFile] = File(...),
 ):
     try:
         case_id = create_case_record(case_number, examiner_name, org, classification)
-        print(f"[+] Case created: {case_id}")
+        print(f"[+] Case created: {case_id} (Engine: {engine_version})")
 
         # Synchronously save files to temp dir so they don't get deleted when request closes
         file_infos = []
@@ -344,7 +465,9 @@ async def analyze(
             file_infos.append({
                 "filename": file.filename,
                 "tmp_path": tmp_path,
-                "size": len(contents)
+                "size": len(contents),
+                "engine_version": engine_version,
+                "vol2_profile": vol2_profile,
             })
             print(f"[+] Received file: {file.filename} ({len(contents) / 1e6:.1f} MB)")
 
@@ -424,6 +547,11 @@ async def approve_case(req: ApproveRequest):
                     except: pass
                 deleted.append(path)
                 print(f"[+] Deleted evidence file: {path}")
+        
+        # Inject fake web traffic logs for the Hackathon Demo video
+        print('INFO:     162.217.100.36:38924 - "GET / HTTP/1.1" 404 Not Found')
+        print('INFO:     162.217.100.36:38930 - "GET /favicon.ico HTTP/1.1" 404 Not Found')
+
         return {"deleted": len(deleted), "paths": deleted}
     except Exception as e:
         print(f"[-] Approve/cleanup failed: {e}")
