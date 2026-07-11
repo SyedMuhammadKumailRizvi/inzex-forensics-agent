@@ -84,7 +84,7 @@ export default function Workspace({ params }: { params: Promise<{ caseId: string
     const interval = setInterval(() => {
       setCaseData(currentCase => {
         setFindings(currentFindings => {
-          const needsPolling = currentCase?.status === 'processing' || currentFindings.some(f => f.status === 'rechecking');
+          const needsPolling = currentCase?.status === 'analyzing' || currentFindings.some(f => f.status === 'rechecking');
           if (needsPolling) fetchData();
           return currentFindings;
         });
@@ -252,7 +252,7 @@ export default function Workspace({ params }: { params: Promise<{ caseId: string
                   <p style={{ fontSize: 11, letterSpacing: 1.5, textTransform: 'uppercase', color: 'var(--text-tertiary)', margin: '0 0 3px' }}>Forensic Analysis Stages</p>
                   <p style={{ fontSize: 13, color: 'var(--text-secondary)', margin: '0 0 16px' }}>Volatility 3 Plugins executed</p>
 
-                  {caseData.status === 'processing' ? (
+                  {caseData.status === 'analyzing' ? (
                     <p style={{ color: 'var(--text-tertiary)', fontSize: 13, padding: 12 }}>Waiting for Unicorn Engine analysis to complete...</p>
                   ) : findings.length === 0 ? (
                     <p style={{ color: 'var(--text-tertiary)', fontSize: 13, padding: 12 }}>✓ Analysis complete. No threats detected.</p>
