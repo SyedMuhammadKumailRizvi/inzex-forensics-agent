@@ -12,9 +12,10 @@ import { Case, Finding, Evidence } from '@/types/database';
 
 const PRINT_CSS = `
 @media print {
-  @page { margin: 0; size: A4; }
+  @page { margin: 15mm; size: A4; }
   html, body { height: auto !important; min-height: 100% !important; overflow: visible !important; background: #08080C !important; color: #e0e0e0 !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; margin: 0 !important; padding: 0 !important; }
-  .app, .print-only { display: block !important; height: auto !important; min-height: 100% !important; overflow: visible !important; padding: 0 !important; max-width: 100% !important; background: #08080C !important; }
+  .app { background: #08080C !important; }
+  .print-only { display: block !important; height: auto !important; min-height: 100% !important; overflow: visible !important; padding: 20px !important; max-width: 100% !important; background: #08080C !important; }
   .hide-on-print { display: none !important; }
   * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
 }
