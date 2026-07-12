@@ -109,30 +109,32 @@ Dashboard available at `http://localhost:3000`.
 
 ### 3. Deploy the Unicorn Engine (AMD FastAPI)
 
-Our backend runs on a remote AMD Developer Cloud instance inside a Docker container (to utilize ROCm and vLLM). Follow these steps to deploy the Python worker:
+To minimize idle GPU costs, we have fully automated the backend deployment. You can spin up a fresh AMD Developer Cloud instance and configure it in minutes using the provided setup script.
 
-**1. Transfer the backend script to your AMD server:**
+**1. Clone the repository on your remote AMD server:**
 ```bash
-# SCP from your local machine to the remote AMD server
-scp "/path/to/local/inzex-forensics-agent/worker/inzex_engine.py" root@<YOUR_AMD_SERVER_IP>:/tmp/inzex_engine.py
+git clone https://github.com/SyedMuhammadKumailRizvi/inzex-forensics-agent.git
+cd inzex-forensics-agent/worker
 ```
 
-**2. Copy the script into the ROCm Docker container:**
+**2. Run the automated setup script:**
 ```bash
-# SSH into your AMD server and start the ROCm container
-docker start rocm
+chmod +x setup_server.sh
+./setup_server.sh
+```
+This script automatically installs Docker, pulls the AMD `rocm/vllm-dev` image, downloads Volatility 3, and configures `cloudflared`.
 
-# Copy the file from the host into the running container
-docker cp /tmp/inzex_engine.py rocm:/app/inzex_engine.py
+**3. Start the FastAPI server inside the container:**
+The setup script will output a `docker run` command. Copy and run it to enter the GPU-accelerated container, then start the server:
+```bash
+pip install -r /app/requirements.txt
+uvicorn inzex_engine:app --host 0.0.0.0 --port 8000
 ```
 
-**3. Start the FastAPI server and expose it:**
+**4. Expose the port using Cloudflare:**
+In a new terminal window on the host, run:
 ```bash
-# Start the FastAPI engine inside the container (e.g., via uvicorn)
-# Then, expose the local port 8000 using a Cloudflare Tunnel
 cloudflared tunnel --url http://localhost:8000 > tunnel.log 2>&1 &
-
-# Retrieve your public Cloudflare Tunnel URL
 grep -o 'https://.*\.trycloudflare\.com' tunnel.log
 ```
 > **⚠️ Important Cloudflare & Netlify Limitation:** Cloudflare Tunnels strictly reject HTTP requests larger than 100MB. If you are accessing the backend via a Cloudflare Tunnel or the frontend via Netlify, you cannot upload full multi-gigabyte memory dumps. To test the complete AI pipeline, please use the provided `dummy_evidence.vmem` (1MB) included in the root of this repository.
